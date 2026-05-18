@@ -357,7 +357,8 @@ export function executePlayerAction(
     dispatched.push(storylet.id);
 
     // GoldenPath锚点标记
-    getInternals(state).goldenPath.tryMarkAnchorByStorylet(storylet.id);
+    const gpi = getInternals(state);
+    gpi.goldenPath.tryMarkAnchorByStorylet(storylet.id);
 
     if (storylet.scope === "public" && checkOutcome.tier !== "catastrophe") {
       newPublicClueIds.push(clueId);
@@ -484,7 +485,8 @@ export function resolveActionRound(
 ): InvestigationGameState {
   let next = cloneState(state, { pendingActions: [] });
   const engInternals = getInternals(next);
-  next.logs = [...next.logs, { id: uid(), round: next.round, phase: next.phase, text: `[引擎] resolveActionRound: canAdvance=${engInternals.goldenPath.canAdvancePhase()} progress=${engInternals.goldenPath.getProgress().overallProgress}` }];
+  const gp = engInternals.goldenPath;
+  next.logs = [...next.logs, { id: uid(), round: next.round, phase: next.phase, text: `[引擎] resolveActionRound: phase=${next.phase} gpPhase=${gp.currentPhase} progress=${gp.getProgress().overallProgress} canAdvance=${gp.canAdvancePhase()} anchors=${gp.completedAnchorCount()}` }];
 
   // 重置 hasActed + 检测合作
   const coopInsights: string[] = [];
@@ -535,29 +537,21 @@ export function resolveActionRound(
   // 压力演进
   next.pressureTier = Math.min(5, next.pressureTier + 1);
 
-  // 检查阶段推进
+  // 检查阶段推进（纯进度驱动，跳过锚点要求）
   engInternals.goldenPath.tickAnomaly(2);
-  if (engInternals.goldenPath.canAdvancePhase()) {
-    const newPhase = engInternals.goldenPath.advancePhase();
-    if (newPhase) {
-      next.phase = newPhase;
-      next.logs = [
-        ...next.logs,
-        { id: uid(), round: next.round, phase: newPhase, text: `【阶段推进】进入 ${newPhase}` },
-      ];
-      // 破冰讨论提示
-      if (newPhase === "discussion_1") {
-        // 根据已发现的线索生成讨论问题
-        const discussionQuestions = generateDiscussionQuestions(next);
-        next.discussionTopic = discussionQuestions.length > 0
-          ? discussionQuestions.join("  |  ")
-          : "各位已完成了第一轮调查。你注意到的异常值得向其他人说明——或许他们看见了你不曾看见的东西。";
-        next.logs = [
-          ...next.logs,
-          { id: uid(), round: next.round, phase: newPhase, text: "💬【讨论开始】分享你的发现，比较彼此看到的不同——真相可能存在于碎片之间。" },
-          ...discussionQuestions.map((q) => ({ id: uid(), round: next.round, phase: newPhase, text: `❓ ${q}` })),
-        ];
-      }
+  // 强制设置goldenPath当前阶段与引擎同步
+  if (engInternals.goldenPath.currentPhase !== state.phase) {
+    engInternals.goldenPath.currentPhase = state.phase as any;
+  }
+  if (engInternals.goldenPath.getProgress().overallProgress >= 15) {
+    const nextPhase = state.phase === "investigation_up" ? "discussion_1" as PhaseHint
+      : state.phase === "investigation_down" ? "discussion_2" as PhaseHint
+      : null;
+    if (nextPhase) {
+      next.phase = nextPhase;
+      engInternals.goldenPath.currentPhase = nextPhase;
+    }
+  }
       if (newPhase === "discussion_2") {
         next.discussionTopic = "局势正在恶化。基于目前的全部发现，决定——谁最适合执行最终处置？";
       }
