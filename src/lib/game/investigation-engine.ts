@@ -190,7 +190,7 @@ export function executePlayerAction(
   const { attribute } = mapCategory(card.category);
 
   // 查找匹配 Storylet
-  const storylet = findMatchingStorylet(state, player.roleId, attribute);
+  const storylet = findMatchingStorylet(state, player.roleId, attribute, action.targetId);
 
   // 计算难度
   const difficulty = calcDifficulty(storylet?.check?.baseDifficulty ?? 12, {
@@ -487,18 +487,118 @@ export function serializePlayerState(
 }
 
 // ══════════════════════════════════════════════════
+//  调查目标
+// ══════════════════════════════════════════════════
+
+/** 调查目标定义 */
+export interface InvestigationTarget {
+  id: string;
+  name: string;
+  hint: string;
+  /** 关联的 Storylet ID 列表（优先匹配） */
+  storyletIds: string[];
+}
+
+/** 全案调查目标 */
+export const INVESTIGATION_TARGETS: Record<string, InvestigationTarget> = {
+  basement: {
+    id: "basement",
+    name: "教堂地下室",
+    hint: "灰白盐痕的源头 · 石碑所在",
+    storyletIds: [
+      "seed-public-salt-spread",
+      "seed-public-salt-expansion",
+      "seed-public-artifacts-resonance",
+    ],
+  },
+  morgue: {
+    id: "morgue",
+    name: "临时停尸房",
+    hint: "死者的最后遗言 · 尸检记录",
+    storyletIds: [
+      "seed-public-missing-page",
+      "seed-public-second-body",
+    ],
+  },
+  archives: {
+    id: "archives",
+    name: "值夜者档案室",
+    hint: "被借走三年的旧案记录",
+    storyletIds: [
+      "seed-public-missing-archives",
+      "seed-private-edwin-griffin-record",
+    ],
+  },
+  church_perimeter: {
+    id: "church_perimeter",
+    name: "教堂周边街区",
+    hint: "巡夜人证词的矛盾点 · 灵性引导标记",
+    storyletIds: [
+      "seed-public-watchman-contradiction",
+      "seed-public-charity-route",
+    ],
+  },
+  charity_office: {
+    id: "charity_office",
+    name: "慈善项目办公室",
+    hint: "亚瑟签名的所在 · 被安排的路线",
+    storyletIds: [
+      "seed-public-charity-route",
+    ],
+  },
+  spirit_realm: {
+    id: "spirit_realm",
+    name: "灵界边缘",
+    hint: "通灵者能听到的低语 · 不散的残响",
+    storyletIds: [
+      "seed-public-nightmare-wave",
+    ],
+  },
+};
+
+/** 获取当前阶段可用的调查目标 */
+export function getAvailableTargets(phase: string): InvestigationTarget[] {
+  const all = Object.values(INVESTIGATION_TARGETS);
+  if (phase === "investigation_up") {
+    return all.filter((t) =>
+      ["basement", "morgue", "archives", "church_perimeter", "spirit_realm"].includes(t.id)
+    );
+  }
+  if (phase === "investigation_down") {
+    return all; // P3 所有目标可用
+  }
+  return [];
+}
+
+// ══════════════════════════════════════════════════
 //  内部工具
 // ══════════════════════════════════════════════════
 
 function findMatchingStorylet(
   state: InvestigationGameState,
   roleId: string,
-  attr: Attribute
+  attr: Attribute,
+  targetId: string
 ): InvestigationStoryletSeed | null {
   const dispatched = new Set(state.dispatchedStoryletIds);
   const pool = investigationV2StoryletSeeds;
+  const target = INVESTIGATION_TARGETS[targetId];
 
-  // 1. 优先：匹配当前 phase + 带有 check 配置且属性匹配的公共 Storylet
+  // 1. 优先：该目标关联的 Storylet + 匹配 phase + 匹配属性
+  if (target) {
+    let candidates = pool.filter(
+      (s) =>
+        s.phaseHint === state.phase &&
+        target.storyletIds.includes(s.id) &&
+        (s.check?.attribute === attr || !s.check) &&
+        !dispatched.has(s.id)
+    );
+    if (candidates.length > 0) {
+      return candidates[Math.floor(Math.random() * candidates.length)];
+    }
+  }
+
+  // 2. 其次：匹配当前 phase + 带有 check 配置且属性匹配的公共 Storylet
   let candidates = pool.filter(
     (s) =>
       s.phaseHint === state.phase &&
@@ -510,7 +610,7 @@ function findMatchingStorylet(
     return candidates[Math.floor(Math.random() * candidates.length)];
   }
 
-  // 2. 其次：匹配当前 phase 的任意公共 Storylet
+  // 3. 再次：匹配当前 phase 的任意公共 Storylet
   candidates = pool.filter(
     (s) =>
       s.phaseHint === state.phase &&
@@ -521,7 +621,7 @@ function findMatchingStorylet(
     return candidates[Math.floor(Math.random() * candidates.length)];
   }
 
-  // 3. 再次：匹配当前 phase 的该角色私密 Storylet
+  // 4. 最后：匹配当前 phase 的该角色私密 Storylet
   candidates = pool.filter(
     (s) =>
       s.phaseHint === state.phase &&

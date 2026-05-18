@@ -69,6 +69,23 @@ function pressureLabel(tier: number): string {
   return m[tier] ?? `Tier ${tier}`;
 }
 
+// ── 调查目标 ──
+
+interface TargetInfo { id: string; name: string; hint: string; }
+
+const TARGETS_UP: TargetInfo[] = [
+  { id: "basement", name: "教堂地下室", hint: "灰白盐痕的源头 · 石碑所在" },
+  { id: "morgue", name: "临时停尸房", hint: "死者的遗言 · 尸检记录" },
+  { id: "archives", name: "值夜者档案室", hint: "被借走的旧案记录" },
+  { id: "church_perimeter", name: "教堂周边街区", hint: "巡夜人证词矛盾点" },
+  { id: "spirit_realm", name: "灵界边缘", hint: "不散的残响" },
+];
+
+const TARGETS_DOWN: TargetInfo[] = [
+  ...TARGETS_UP,
+  { id: "charity_office", name: "慈善项目办公室", hint: "亚瑟的签名 · 被安排的路线" },
+];
+
 // ═══════════════════════════════════════
 //  主组件
 // ═══════════════════════════════════════
@@ -78,6 +95,7 @@ export function RoomClient({ roomCode }: { roomCode: string }) {
   const [state, setState] = useState<FrontendPlayerState | null>(null);
   const [error, setError] = useState("");
   const [selectedCard, setSelectedCard] = useState<FrontendCard | null>(null);
+  const [selectedTargetId, setSelectedTargetId] = useState<string | null>(null);
   const [readySubmitting, setReadySubmitting] = useState(false);
   const [voteSubmitting, setVoteSubmitting] = useState(false);
 
@@ -128,12 +146,17 @@ export function RoomClient({ roomCode }: { roomCode: string }) {
       setError("当前阶段不能行动");
       return;
     }
-    // MVP: 不需要选目标，直接打出
+    if (!selectedTargetId) {
+      setError("请先选择调查目标");
+      return;
+    }
     setSelectedCard(null);
+    setSelectedTargetId(null);
     getSocket().emit("game:play", {
       roomCode,
       cardId: card.id,
       isFaceDown: false,
+      targetPlayerId: selectedTargetId,
     });
   };
 
@@ -271,8 +294,44 @@ export function RoomClient({ roomCode }: { roomCode: string }) {
           {inAction && (
             <div>
               <div style={{ fontSize: 14, color: "#8b949e", marginBottom: 16 }}>
-                {currentPlayer?.id === state?.publicState.activePlayerId ? "🎯 当前是你的行动回合" : "等待其他玩家行动..."}
+                {currentPlayer?.id === state?.publicState.activePlayerId
+                  ? selectedTargetId ? "🃏 选择行动卡" : "🎯 选择调查目标"
+                  : "⏳ 等待其他玩家行动..."}
               </div>
+
+              {/* 调查目标网格 */}
+              {!selectedTargetId && currentPlayer?.id === state?.publicState.activePlayerId && (
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 10, marginBottom: 20 }}>
+                  {(phase === "investigation_up" ? TARGETS_UP : TARGETS_DOWN).map((t) => (
+                    <div
+                      key={t.id}
+                      onClick={() => setSelectedTargetId(t.id)}
+                      style={{
+                        background: "#161b22", border: "2px solid #30363d", borderRadius: 10, padding: 16, cursor: "pointer",
+                        transition: "border-color 0.15s, background 0.15s",
+                      }}
+                      onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.borderColor = "#d4a574"; }}
+                      onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.borderColor = "#30363d"; }}
+                    >
+                      <div style={{ fontSize: 15, fontWeight: 600, color: "#d4a574" }}>{t.name}</div>
+                      <div style={{ fontSize: 11, color: "#8b949e", marginTop: 6 }}>{t.hint}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* 已选目标提示 */}
+              {selectedTargetId && (
+                <div style={{ marginBottom: 20, padding: "8px 16px", background: "#d4a57411", border: "1px solid #d4a57444", borderRadius: 8, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span style={{ color: "#d4a574", fontSize: 13 }}>
+                    🎯 选中：{TARGETS_UP.find(t => t.id === selectedTargetId)?.name ?? selectedTargetId}
+                  </span>
+                  <button onClick={() => setSelectedTargetId(null)} style={{ background: "none", border: "none", color: "#8b949e", cursor: "pointer", fontSize: 13 }}>
+                    重新选择
+                  </button>
+                </div>
+              )}
+
               {/* 玩家列表 */}
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 8, marginBottom: 20 }}>
                 {state?.publicState?.players?.map((p) => (
@@ -361,8 +420,8 @@ export function RoomClient({ roomCode }: { roomCode: string }) {
         </aside>
       </main>
 
-      {/* ── 手牌区（仅行动阶段） ── */}
-      {inAction && state?.privateHand && (
+      {/* ── 手牌区（仅行动阶段 + 已选目标） ── */}
+      {inAction && selectedTargetId && state?.privateHand && (
         <footer style={{
           position: "fixed", bottom: 0, left: 0, right: 0,
           background: "#161b22", borderTop: "1px solid #30363d",
