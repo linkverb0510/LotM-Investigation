@@ -1252,6 +1252,18 @@ function findMatchingStorylet(
 }
 
 /** 根据已发现的公共线索生成讨论问题 */
+/** 获取下一位未行动的行动者 */
+function getNextActivePlayer(state: InvestigationGameState, currentPlayerId: string): string | null {
+  const currentIdx = state.players.findIndex((p) => p.id === currentPlayerId);
+  if (currentIdx === -1) return null;
+  for (let i = 1; i <= state.players.length; i++) {
+    const idx = (currentIdx + i) % state.players.length;
+    const p = state.players[idx];
+    if (!p.hasActed) return p.id;
+  }
+  return null;
+}
+
 function generateDiscussionQuestions(state: InvestigationGameState): string[] {
   const clueQuestionMap: Record<string, string> = {
     "clue_seed-public-salt-spread": "地下室的灰白盐痕是不完整的仪式圆弧——为什么它没有被完成？",
