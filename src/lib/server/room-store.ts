@@ -9,6 +9,7 @@ import {
   resolveActionRound,
   resolveEnding,
   serializePlayerState,
+  usePathwayAbility,
 } from "@/lib/game/investigation-engine";
 import type { JoinRoomInput, RoomSummary, ChatMessage, GamePhase } from "@/lib/game/types";
 import type { InvestigationGameState, PlayerAction, PlayerVote } from "@/lib/game/investigation-v2/schema";
@@ -160,6 +161,7 @@ class RoomStore {
       publicState: privateState.publicState,
       privateHand: privateState.privateHand,
       privateClueIds: privateState.privateClueIds,
+      privateClueTexts: privateState.privateClueTexts,
       roleId: player.roleId,
       roleName: `${player.roleName} / ${player.roleTitle}`,
       roleOrg: player.roleOrg,
@@ -169,28 +171,12 @@ class RoomStore {
       corruption: player.corruption,
       readyPlayers: room.gameState.readyPlayers,
       agendaCompleted: player.agendaCompleted,
+      firstLook: player.firstLook ?? "",
+      agendaGoal: player.agendaGoal ?? "",
+      agendaResult: (privateState as any).agendaResult ?? "",
+      lastOutcome: player.lastOutcome ?? null,
       pendingChoice: null,
       hasPendingChoice: false,
-    };
-  }
-
-    const player = room.gameState.players.find((entry) => entry.id === playerId);
-
-    if (!player) {
-      throw new Error("Player not found.");
-    }
-
-    return {
-      // 显式传入 viewerId，给未来的“按观察者裁剪公开信息”预留接口。
-      publicState: serializePublicState(room.gameState, playerId),
-      privateHand: player.hand,
-      roleName: `${player.role.name} / ${player.role.title}`,
-      readyPlayers: room.gameState.readyPlayers,
-      roleFaction: player.role.faction,
-      // 只有被剧情点名的玩家才能拿到完整抉择内容，避免其他客户端提前穿帮。
-      pendingChoice:
-        room.gameState.pendingChoice?.targetPlayerId === playerId ? room.gameState.pendingChoice : null,
-      hasPendingChoice: room.gameState.pendingChoice !== null
     };
   }
 
@@ -298,7 +284,6 @@ class RoomStore {
     const room = this.rooms.get(roomCode.toUpperCase());
     if (!room?.gameState) throw new Error("Game not found.");
 
-    const { usePathwayAbility } = require("@/lib/game/investigation-engine");
     const result = usePathwayAbility(room.gameState, playerId, abilityId, targetPlayerId);
     if (!result) return null;
 
