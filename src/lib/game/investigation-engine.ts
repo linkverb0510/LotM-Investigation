@@ -136,7 +136,14 @@ export function createInvestigationGame(
     pendingActions: [],
     pendingVotes: [],
     readyPlayers: [],
-    logs: [...],
+    logs: [
+      {
+        id: uid(),
+        round: 0,
+        phase: "briefing",
+        text: "贝克兰德东区·1352年秋。一周内数起异常死亡被秘密上报。调查组集结。",
+      },
+    ],
     resolutionPath: null,
     dispatchedStoryletIds: [],
     roundLocations: {},
