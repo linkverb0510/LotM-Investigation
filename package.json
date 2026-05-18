@@ -4,8 +4,9 @@
   "private": true,
   "scripts": {
     "dev": "tsx watch src/server.ts",
-    "build": "next build",
-    "start": "NODE_ENV=production tsx src/server.ts",
+    "build": "prisma generate && next build",
+    "start": "tsx src/server.ts",
+    "postinstall": "prisma generate",
     "lint": "next lint",
     "test": "vitest run",
     "test:watch": "vitest",
