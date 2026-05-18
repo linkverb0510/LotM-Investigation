@@ -31,6 +31,18 @@ function getInternals(state: InvestigationGameState): EngineInternals {
   }
   return internalsMap.get(state)!;
 }
+
+/** 创建新 state 对象时自动转移 internals 引用 */
+function cloneState(
+  state: InvestigationGameState,
+  overrides: Partial<InvestigationGameState> = {}
+): InvestigationGameState {
+  const newState = { ...state, ...overrides };
+  if (internalsMap.has(state)) {
+    internalsMap.set(newState, internalsMap.get(state)!);
+  }
+  return newState;
+}
 import { InvestigationBridge } from "./investigation-v2/bridge";
 
 // ── 卡牌类别 → 行动类别 + 属性映射 ──
@@ -163,7 +175,7 @@ export function confirmReady(
 ): InvestigationGameState {
   if (state.readyPlayers.includes(playerId)) return state;
 
-  const next = { ...state, readyPlayers: [...state.readyPlayers, playerId] };
+  const next = cloneState(state, { readyPlayers: [...state.readyPlayers, playerId] });
   const p = next.players.find((pl) => pl.id === playerId);
 
   if (next.readyPlayers.length === next.players.length) {
@@ -293,8 +305,7 @@ export function executePlayerAction(
     roundLocations[action.targetId] = [...roundLocations[action.targetId], player.id];
   }
 
-  const nextState: InvestigationGameState = {
-    ...state,
+  const nextState = cloneState(state, {
     players,
     publicClueIds: [...state.publicClueIds, ...newPublicClueIds],
     pendingActions: [...state.pendingActions, action],
@@ -314,7 +325,7 @@ export function executePlayerAction(
     ],
     dispatchedStoryletIds: state.dispatchedStoryletIds,
     roundLocations,
-  };
+  });
 
   return { state: nextState, outcome };
 }
@@ -326,7 +337,7 @@ export function executePlayerAction(
 export function resolveActionRound(
   state: InvestigationGameState
 ): InvestigationGameState {
-  let next = { ...state, pendingActions: [] };
+  let next = cloneState(state, { pendingActions: [] });
 
   // 重置 hasActed + 检测合作
   const coopInsights: string[] = [];
@@ -388,9 +399,6 @@ export function resolveActionRound(
     }
   }
 
-  // 保留 internals 映射
-  internalsMap.set(next, internals);
-
   return next;
 }
 
@@ -404,10 +412,7 @@ export function submitVote(
 ): InvestigationGameState {
   if (state.pendingVotes.some((v) => v.playerId === vote.playerId)) return state;
 
-  const next = {
-    ...state,
-    pendingVotes: [...state.pendingVotes, vote],
-  };
+  const next = cloneState(state, { pendingVotes: [...state.pendingVotes, vote] });
 
   if (next.pendingVotes.length === next.players.length) {
     // 讨论结束 → 推进阶段
@@ -466,7 +471,7 @@ export function resolveEnding(
   }
 
   // 结算个人议程
-  const next = resolveAgendas({ ...state, resolutionPath: path }, path);
+  const next = resolveAgendas(cloneState(state, { resolutionPath: path }), path);
 
   return {
     ...next,
@@ -747,7 +752,7 @@ export function usePathwayAbility(
   });
 
   return {
-    state: { ...state, players },
+    state: cloneState(state, { players }),
     resultText,
     targetPerception,
   };
@@ -1012,5 +1017,5 @@ function resolveAgendas(state: InvestigationGameState, resolutionPath: string): 
     }
     return { ...p, agendaCompleted: completed };
   });
-  return { ...state, players };
+  return cloneState(state, { players });
 }
