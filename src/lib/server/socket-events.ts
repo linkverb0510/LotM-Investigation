@@ -252,6 +252,18 @@ export function registerSocketHandlers(io: Server): void {
     });
 
 
+    // 公开私密线索
+    socket.on("game:share_clue", ({ roomCode, clueId }: { roomCode: string; clueId: string }) => {
+      try {
+        const { player } = roomStore.getPlayerBySocket(socket.id);
+        roomStore.applyShareClue(roomCode, player.id, clueId);
+        emitRoomSnapshot(io, roomCode);
+      } catch (error) {
+        socket.emit("server:error", error instanceof Error ? error.message : "Failed to share clue.");
+      }
+    });
+
+
     socket.on("disconnect", () => {
       const room = roomStore.removePlayer(socket.id);
 

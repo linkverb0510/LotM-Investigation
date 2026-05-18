@@ -10,6 +10,7 @@ import {
   resolveEnding,
   serializePlayerState,
   usePathwayAbility,
+  sharePrivateClue,
 } from "@/lib/game/investigation-engine";
 import type { JoinRoomInput, RoomSummary, ChatMessage, GamePhase } from "@/lib/game/types";
 import type { InvestigationGameState, PlayerAction, PlayerVote } from "@/lib/game/investigation-v2/schema";
@@ -290,6 +291,15 @@ class RoomStore {
 
     room.gameState = result.state;
     return { room, resultText: result.resultText, targetPerception: result.targetPerception };
+  }
+
+  // [V2] 公开私密线索
+  applyShareClue(roomCode: string, playerId: string, clueId: string): StoredRoom {
+    const room = this.rooms.get(roomCode.toUpperCase());
+    if (!room?.gameState) throw new Error("Game not found.");
+    const newState = sharePrivateClue(room.gameState, playerId, clueId);
+    if (newState) room.gameState = newState;
+    return room;
   }
 
   // [Dev Mode] 处理开发者指令

@@ -315,7 +315,15 @@ export function RoomClient({ roomCode }: { roomCode: string }) {
               <div style={{ fontSize: 13, color: "#d4a574", marginBottom: 8 }}>📋 你的私密发现</div>
               {state?.privateClueTexts?.map((ct) => (
                 <div key={ct.id} style={{ fontSize: 11, color: "#c9d1d9", padding: "6px 0", borderBottom: "1px solid #30363d", lineHeight: 1.5 }}>
-                  <span style={{ color: "#d4a574", fontWeight: 600 }}>{ct.title}</span>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <span style={{ color: "#d4a574", fontWeight: 600 }}>{ct.title}</span>
+                    <button
+                      onClick={() => getSocket().emit("game:share_clue", { roomCode, clueId: ct.id })}
+                      style={{ background: "#23863622", border: "1px solid #23863644", color: "#3fb950", borderRadius: 4, padding: "2px 6px", fontSize: 10, cursor: "pointer" }}
+                    >
+                      📢 公开
+                    </button>
+                  </div>
                   <div style={{ color: "#8b949e", marginTop: 2 }}>{ct.text.length > 80 ? ct.text.slice(0, 80) + "..." : ct.text}</div>
                 </div>
               ))}

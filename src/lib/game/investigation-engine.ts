@@ -95,7 +95,47 @@ function uid(): string {
 }
 
 // ══════════════════════════════════════════════════
-//  初始化
+//  线索公开分享
+// ══════════════════════════════════════════════════
+
+/** 将一条私密线索公开 */
+export function sharePrivateClue(
+  state: InvestigationGameState,
+  playerId: string,
+  clueId: string
+): InvestigationGameState | null {
+  const playerIdx = state.players.findIndex((p) => p.id === playerId);
+  if (playerIdx === -1) return null;
+
+  const player = state.players[playerIdx];
+  const clueIdx = player.privateClueIds.indexOf(clueId);
+  if (clueIdx === -1) return null;
+
+  const clueText = player.privateClueTexts.find((ct) => ct.id === clueId);
+
+  const newPrivateClueIds = [...player.privateClueIds];
+  newPrivateClueIds.splice(clueIdx, 1);
+  const newPrivateClueTexts = player.privateClueTexts.filter((ct) => ct.id !== clueId);
+
+  const newPlayers = [...state.players];
+  newPlayers[playerIdx] = {
+    ...player,
+    privateClueIds: newPrivateClueIds,
+    privateClueTexts: newPrivateClueTexts,
+  };
+
+  return cloneState(state, {
+    players: newPlayers,
+    publicClueIds: [...state.publicClueIds, clueId],
+    logs: [
+      ...state.logs,
+      { id: uid(), round: state.round, phase: state.phase, text: `📢 ${player.roleName} 公开了一条线索：${clueText?.title ?? clueId}` },
+    ],
+  });
+}
+
+// ══════════════════════════════════════════════════
+//  卡牌适配
 // ══════════════════════════════════════════════════
 
 export function createInvestigationGame(
@@ -132,7 +172,37 @@ export function createInvestigationGame(
     };
   });
 
-  const goldenPath = createDefaultGoldenPath("case-east-district", {});
+  const goldenPath = createDefaultGoldenPath("case-east-district", {
+    investigation_up: [
+      {
+        anchorId: "anchor-p1-discovery",
+        phaseHint: "investigation_up",
+        requiredCount: 2,
+        targetStoryletIds: [
+          "seed-public-salt-spread",
+          "seed-public-missing-page",
+          "seed-public-watchman-contradiction",
+        ],
+        saturationPaths: [],
+        fallbackTurn: 3,
+      },
+    ],
+    investigation_down: [
+      {
+        anchorId: "anchor-p3-discovery",
+        phaseHint: "investigation_down",
+        requiredCount: 2,
+        targetStoryletIds: [
+          "seed-public-salt-expansion",
+          "seed-public-second-body",
+          "seed-public-artifacts-resonance",
+          "seed-public-missing-archives",
+        ],
+        saturationPaths: [],
+        fallbackTurn: 4,
+      },
+    ],
+  });
   const gameState = new GameState();
   goldenPath.attachToGameState(gameState);
 
