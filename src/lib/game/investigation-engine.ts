@@ -584,11 +584,6 @@ export function resolveActionRound(
         }
       }
   }
-      if (newPhase === "discussion_2") {
-        next.discussionTopic = "局势正在恶化。基于目前的全部发现，决定——谁最适合执行最终处置？";
-      }
-    }
-  }
 
   return next;
 }
