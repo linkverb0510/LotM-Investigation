@@ -46,6 +46,8 @@ interface FrontendPlayerState {
   corruption: number;
   agendaCompleted: boolean;
   firstLook: string;
+  agendaGoal: string;
+  agendaResult: string;
   selfPlayerId: string;
   readyPlayers: string[];
   lastOutcome?: {
@@ -329,6 +331,17 @@ export function RoomClient({ roomCode }: { roomCode: string }) {
                 </div>
               )}
 
+              {/* 个人议程 */}
+              {state?.agendaGoal && (
+                <div style={{
+                  maxWidth: 600, margin: "16px auto", padding: 16,
+                  background: "#d4a57411", border: "1px solid #d4a57444", borderRadius: 10,
+                  textAlign: "left", lineHeight: 1.7, fontSize: 13, color: "#d4a574",
+                }}>
+                  <span style={{ fontWeight: 600 }}>🎯 个人目标：</span>{state.agendaGoal}
+                </div>
+              )}
+
               <p style={{ color: "#8b949e", marginTop: 12 }}>阅读你的角色信息和私密隐情，准备就绪。</p>
               {!isReady ? (
                 <button onClick={handleReady} disabled={readySubmitting}
@@ -432,13 +445,21 @@ export function RoomClient({ roomCode }: { roomCode: string }) {
               <h2 style={{ fontSize: 24, color: "#d4a574" }}>案件收束</h2>
 
               {state?.publicState?.resolutionPath ? (
-                <p style={{ color: "#8b949e", marginTop: 16, maxWidth: 600, margin: "16px auto", lineHeight: 1.8 }}>
-                  {state.publicState.resolutionPath === "perfect"
-                    ? "石碑被重新封印，旧案报告重见天日。真相抵达了该抵达的人。"
-                    : state.publicState.resolutionPath === "compromise"
-                    ? "事情被压住了，名字被保住了。但你们都知道，还有什么东西停在封签后面。"
-                    : "崩坏不是结束，而是那句低语变得更安静、更不肯离开的开始。"}
-                </p>
+                <div>
+                  <p style={{ color: "#8b949e", marginTop: 16, maxWidth: 600, margin: "16px auto", lineHeight: 1.8 }}>
+                    {state.publicState.resolutionPath === "perfect"
+                      ? "石碑被重新封印，旧案报告重见天日。真相抵达了该抵达的人。"
+                      : state.publicState.resolutionPath === "compromise"
+                      ? "事情被压住了，名字被保住了。但你们都知道，还有什么东西停在封签后面。"
+                      : "崩坏不是结束，而是那句低语变得更安静、更不肯离开的开始。"}
+                  </p>
+                  {state?.agendaResult && (
+                    <div style={{ maxWidth: 600, margin: "20px auto", padding: 16, background: "#d4a57411", border: "1px solid #d4a57444", borderRadius: 10, textAlign: "left", lineHeight: 1.8, fontSize: 13, color: "#d4a574" }}>
+                      <span style={{ fontWeight: 600 }}>{state.agendaCompleted ? "✅ 目标达成" : "❌ 目标未达成"}</span>
+                      <div style={{ marginTop: 8, color: "#c9d1d9" }}>{state.agendaResult}</div>
+                    </div>
+                  )}
+                </div>
               ) : (
                 <div>
                   <p style={{ color: "#8b949e", marginTop: 16, maxWidth: 500, margin: "16px auto" }}>

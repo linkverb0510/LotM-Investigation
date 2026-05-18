@@ -360,6 +360,8 @@ export interface InvestigatorState {
   firstLook?: string;
   /** 最近一次行动的结果（仅对本人可见，用于前端弹窗） */
   lastOutcome?: ActionOutcome | null;
+  /** 个人议程目标文本（P0展示，P6结算） */
+  agendaGoal?: string;
 }
 
 /** 一局调查的完整游戏状态 */

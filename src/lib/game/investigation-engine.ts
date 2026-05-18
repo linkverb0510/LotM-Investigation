@@ -116,6 +116,7 @@ export function createInvestigationGame(
       agendaCompleted: false,
       hasActed: false,
       firstLook: generateFirstLook(role.id),
+      agendaGoal: CHARACTER_AGENDAS[role.id]?.goal ?? "",
     };
   });
 
@@ -419,10 +420,12 @@ export function resolveEnding(
       break;
   }
 
+  // 结算个人议程
+  const next = resolveAgendas({ ...state, resolutionPath: path }, path);
+
   return {
-    ...state,
+    ...next,
     phase: "resolution",
-    resolutionPath: path,
     logs: [
       ...state.logs,
       { id: uid(), round: state.round, phase: "resolution", text: `【结局】${endLogText}` },
@@ -504,6 +507,8 @@ export function serializePlayerState(
     maxSpirituality: player?.maxSpirituality ?? 0,
     corruption: player?.corruption ?? 0,
     agendaCompleted: player?.agendaCompleted ?? false,
+    agendaGoal: player?.agendaGoal ?? "",
+    agendaResult: getAgendaResult(player?.roleId ?? "", player?.agendaCompleted ?? false),
     firstLook: player?.firstLook ?? "",
     lastOutcome: player?.lastOutcome ?? null,
   };
@@ -531,6 +536,64 @@ function generateFirstLook(roleId: string): string {
   };
   return lookMap[roleId] ?? "你被召集到东区，参与一场异常死亡案的调查。空气中弥漫着大雾霾的残余——和一种你无法命名的紧张。";
 }
+
+// ══════════════════════════════════════════════════
+//  个人议程
+// ══════════════════════════════════════════════════
+
+/** 角色个人议程定义 */
+export interface CharacterAgenda {
+  roleId: string;
+  goal: string;
+  conditionHint: string;
+  completeText: string;
+  failText: string;
+}
+
+export const CHARACTER_AGENDAS: Record<string, CharacterAgenda> = {
+  "role-01-edwin": {
+    roleId: "role-01-edwin",
+    goal: "让旧案YN-0417报告被正式承认——三年前那份被你亲手写下又被截留的报告，这一次至少要有人读到它。",
+    conditionHint: "在调查中接触旧案档案，并在收束时推动「揭露真相」",
+    completeText: "三年的旧案终于被翻了出来。你那份灵性残留分析报告被重新阅读、正式归档。你只是在值夜日志上写下了一句迟到了三年的话：「已处理。」这一次，这两个字是真的。",
+    failText: "报告再次被封存。你走出值夜站时天刚亮，和三年前一样。唯一的区别是——这一次你没有再翻开那本日志。",
+  },
+  "role-02-lyle": {
+    roleId: "role-02-lyle",
+    goal: "确保仪式残卷的第三页和第七页不落入任何教会之手——销毁它们，然后像往常一样消失。",
+    conditionHint: "在残卷被公开讨论前完成销毁，或在收束时确保关键信息不外泄",
+    completeText: "残卷的关键两页被销毁。你销毁了所有与指令有关的痕迹。二十四小时后你会在贝克兰德某个不起眼的街角等待下一次联络——但这一次，你对联络产生了一丝迟疑。",
+    failText: "残卷落入了教会记录。你的委派者切断了联络——你长久以来的情报庇护消失了。你现在是真正的孤狼了。",
+  },
+  "role-03-austen": {
+    roleId: "role-03-austen",
+    goal: "确保错译祷碑由风暴之主教会优先封存——执行命令，完成教会的私下目标。",
+    conditionHint: "在收束时推动「封印石碑」方向",
+    completeText: "石碑被封入了代罚者的保管设施。教会的评价是「执行到位」。但你的值班记录里有一行你后来删掉的话：「风暴教会徽记在精神同化场内失去指向性。代罚者的信仰不是护盾。」",
+    failText: "你选择了联合封存——违背了「不必等待」的指令。教会不会公开责难你，但你知道自己失去了一些东西。不过你也第一次觉得，自己不是在替政治游戏收拾残局。",
+  },
+  "role-04-cecilia": {
+    roleId: "role-04-cecilia",
+    goal: "保护霍尔文家族的名字不进入案件的公开结论——那个在侧门后面蹲下来对你说「慢一点，别怕」的人，不值得被公开审判。",
+    conditionHint: "在调查深入慈善项目时控制信息流向，或在收束时避免「揭露真相」",
+    completeText: "案件的官方结论里没有霍尔文家族的名字。你在社交圈里听到的版本是「霍尔文家的慈善项目经受了考验」。但你是看人最准的那一个——你知道自己参与了一场体面的掩盖。",
+    failText: "你在讨论中说出了你应该说的话。霍尔文家族的名字和亚瑟一起出现在报告中。两百年声誉全没了。但你在某个失眠的夜晚想起他七岁时对你说的那句话——「慢一点，别怕。」这一次没有慢一点的余地了。",
+  },
+  "role-05-devlin": {
+    roleId: "role-05-devlin",
+    goal: "打破一次通灵者的核心规矩——允许个人情绪介入灵性连接。三年前你遵守了规矩，然后一个十七岁的学徒死了。这一次，你不能再站在规矩这一边。",
+    conditionHint: "在通灵相关行动中触发「灵界漫游」专长，选择深入一层",
+    completeText: "你打破了规矩。你获得了残响中最关键的信息——但代价是你的自我锚定发生了偏移。你在灵界中迷失了大约六秒钟。等回来的时候，你发现灵界归于安静。而安静——第一次不是空洞，而是完成。",
+    failText: "你遵守了规矩。如同三年前面对那个学徒时一样——保持了专业距离。残响信息不够完整。有些事情也许永远不会被回答。但至少这一次，你没有被自己困住。",
+  },
+  "role-06-elias": {
+    roleId: "role-06-elias",
+    goal: "完整记录错译祷碑的十七段祷文结构——不是为任何人，是为了满足那份从十六岁起就停不下来的好奇心。",
+    conditionHint: "在调查中至少两次深入分析仪式的知识检定，或在收束时获取完整石碑信息",
+    completeText: "你把全部十七段祷文记在了脑子里。不需要纸，不需要档案。碑文结构被提交进了正式研究报告——然后被封存在摩斯苦修会的知识库深处。你不知道有多少人会读到它。但那十七段祷文现在住进了你的记忆里——像一个种子。你不知道它什么时候会发芽。",
+    failText: "你在核心逻辑面前停了下来。你把父亲的笔记锁回了书架最高层。好奇心没有消失——但至少这一次，门是你自己锁上的。",
+  },
+};
 
 // ══════════════════════════════════════════════════
 //  调查目标
@@ -702,4 +765,40 @@ function pickResultText(
     }
   }
   return storylet?.textSeed ?? "你进行了一次常规调查。";
+}
+
+/** 根据角色ID和议程完成状态获取结局文本 */
+function getAgendaResult(roleId: string, completed: boolean): string {
+  const agenda = CHARACTER_AGENDAS[roleId];
+  if (!agenda) return "";
+  return completed ? agenda.completeText : agenda.failText;
+}
+
+/** 在收束时结算所有角色的个人议程 */
+function resolveAgendas(state: InvestigationGameState, resolutionPath: string): InvestigationGameState {
+  const players = state.players.map((p) => {
+    let completed = false;
+    switch (p.roleId) {
+      case "role-01-edwin":
+        completed = resolutionPath === "perfect"; // 揭露真相=报告被看见
+        break;
+      case "role-02-lyle":
+        completed = resolutionPath !== "perfect"; // 非揭露=残卷安全
+        break;
+      case "role-03-austen":
+        completed = resolutionPath === "perfect"; // 封印=风暴教会目标达成
+        break;
+      case "role-04-cecilia":
+        completed = resolutionPath !== "perfect"; // 非揭露=家族保住
+        break;
+      case "role-05-devlin":
+        completed = p.corruption >= 3; // 高污染=打破规矩的代价
+        break;
+      case "role-06-elias":
+        completed = state.publicClueIds.length >= 4; // 足够线索=足够的研究材料
+        break;
+    }
+    return { ...p, agendaCompleted: completed };
+  });
+  return { ...state, players };
 }
