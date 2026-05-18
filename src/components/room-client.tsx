@@ -30,6 +30,7 @@ interface FrontendPublicState {
   readyPlayers: string[];
   logs: Array<{ id: string; round: number; phase: string; text: string }>;
   resolutionPath: string | null;
+  roundLocations: Record<string, string[]>;
 }
 
 interface FrontendPlayerState {
@@ -369,30 +370,53 @@ export function RoomClient({ roomCode }: { roomCode: string }) {
               {/* 调查目标网格 */}
               {!selectedTargetId && currentPlayer?.id === state?.publicState.activePlayerId && (
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 10, marginBottom: 20 }}>
-                  {(phase === "investigation_up" ? TARGETS_UP : TARGETS_DOWN).map((t) => (
+                  {(phase === "investigation_up" ? TARGETS_UP : TARGETS_DOWN).map((t) => {
+                    const coopCount = (state?.publicState?.roundLocations?.[t.id]?.length ?? 0);
+                    const hasCoop = coopCount > 0;
+                    return (
                     <div
                       key={t.id}
                       onClick={() => setSelectedTargetId(t.id)}
                       style={{
-                        background: "#161b22", border: "2px solid #30363d", borderRadius: 10, padding: 16, cursor: "pointer",
+                        background: hasCoop ? "#d4a57411" : "#161b22",
+                        border: `2px solid ${hasCoop ? "#d4a57466" : "#30363d"}`,
+                        borderRadius: 10, padding: 16, cursor: "pointer",
                         transition: "border-color 0.15s, background 0.15s",
                       }}
                       onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.borderColor = "#d4a574"; }}
-                      onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.borderColor = "#30363d"; }}
+                      onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.borderColor = hasCoop ? "#d4a57466" : "#30363d"; }}
                     >
-                      <div style={{ fontSize: 15, fontWeight: 600, color: "#d4a574" }}>{t.name}</div>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <span style={{ fontSize: 15, fontWeight: 600, color: "#d4a574" }}>{t.name}</span>
+                        {hasCoop && (
+                          <span style={{ fontSize: 11, color: "#3fb950", background: "#23863622", padding: "2px 6px", borderRadius: 4 }}>
+                            🤝 {coopCount}
+                          </span>
+                        )}
+                      </div>
                       <div style={{ fontSize: 11, color: "#8b949e", marginTop: 6 }}>{t.hint}</div>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
 
               {/* 已选目标提示 */}
               {selectedTargetId && (
                 <div style={{ marginBottom: 20, padding: "8px 16px", background: "#d4a57411", border: "1px solid #d4a57444", borderRadius: 8, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <span style={{ color: "#d4a574", fontSize: 13 }}>
-                    🎯 选中：{TARGETS_UP.find(t => t.id === selectedTargetId)?.name ?? selectedTargetId}
-                  </span>
+                  <div>
+                    <span style={{ color: "#d4a574", fontSize: 13 }}>
+                      🎯 选中：{TARGETS_UP.find(t => t.id === selectedTargetId)?.name ?? selectedTargetId}
+                    </span>
+                    {(state?.publicState?.roundLocations?.[selectedTargetId]?.length ?? 0) > 0 && (
+                      <span style={{ color: "#3fb950", fontSize: 12, marginLeft: 12 }}>
+                        🤝 {state?.publicState?.roundLocations?.[selectedTargetId]
+                          ?.map((pid) => state.publicState.players.find((p) => p.id === pid)?.roleName)
+                          .filter(Boolean)
+                          .join("、")} 已在此调查
+                      </span>
+                    )}
+                  </div>
                   <button onClick={() => setSelectedTargetId(null)} style={{ background: "none", border: "none", color: "#8b949e", cursor: "pointer", fontSize: 13 }}>
                     重新选择
                   </button>

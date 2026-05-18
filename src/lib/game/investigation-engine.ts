@@ -139,6 +139,7 @@ export function createInvestigationGame(
     logs: [...],
     resolutionPath: null,
     dispatchedStoryletIds: [],
+    roundLocations: {},
   };
 
   internalsMap.set(state, { goldenPath, gameState });
@@ -276,7 +277,14 @@ export function executePlayerAction(
   };
 
   const players = [...state.players];
-  players[playerIdx] = { ...player, lastOutcome: outcome }; // 存储结果供前端弹窗
+  players[playerIdx] = { ...player, lastOutcome: outcome };
+
+  // 记录本轮该地点的行动者
+  const roundLocations = { ...state.roundLocations };
+  if (!roundLocations[action.targetId]) roundLocations[action.targetId] = [];
+  if (!roundLocations[action.targetId].includes(player.id)) {
+    roundLocations[action.targetId] = [...roundLocations[action.targetId], player.id];
+  }
 
   const nextState: InvestigationGameState = {
     ...state,
@@ -298,6 +306,7 @@ export function executePlayerAction(
         : []),
     ],
     dispatchedStoryletIds: state.dispatchedStoryletIds,
+    roundLocations,
   };
 
   return { state: nextState, outcome };
@@ -312,8 +321,37 @@ export function resolveActionRound(
 ): InvestigationGameState {
   let next = { ...state, pendingActions: [] };
 
-  // 重置 hasActed
+  // 重置 hasActed + 检测合作
+  const coopInsights: string[] = [];
+  const entries = Object.entries(state.roundLocations);
+  for (const [targetId, playerIds] of entries) {
+    if (playerIds.length >= 2) {
+      const names = playerIds
+        .map((pid) => state.players.find((p) => p.id === pid))
+        .filter(Boolean)
+        .map((p) => p!.roleName);
+      const targetName =
+        INVESTIGATION_TARGETS[targetId]?.name ?? targetId;
+      coopInsights.push(
+        `${names.join("和")}在【${targetName}】分别从不同角度进行了调查——他们的发现互相印证了更深层的线索。`
+      );
+    }
+  }
+
   next.players = next.players.map((p) => ({ ...p, hasActed: false }));
+  next.roundLocations = {}; // 重置本轮回合追踪
+
+  if (coopInsights.length > 0) {
+    next.logs = [
+      ...next.logs,
+      ...coopInsights.map((text) => ({
+        id: uid(),
+        round: next.round,
+        phase: next.phase,
+        text: `🤝【合作洞察】${text}`,
+      })),
+    ];
+  }
 
   // 压力演进
   next.pressureTier = Math.min(5, next.pressureTier + 1);
@@ -488,6 +526,7 @@ export function serializePublicState(state: InvestigationGameState) {
     readyPlayers: state.readyPlayers,
     logs: state.logs,
     resolutionPath: state.resolutionPath,
+    roundLocations: state.roundLocations,
   };
 }
 

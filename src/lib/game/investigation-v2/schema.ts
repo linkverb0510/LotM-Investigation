@@ -392,6 +392,8 @@ export interface InvestigationGameState {
   goldenPath?: unknown;
   /** v2 游戏状态字典（非序列化） */
   gameState?: unknown;
+  /** 本轮各调查地点的行动者列表（用于合作检测） */
+  roundLocations: Record<string, string[]>;
 }
 
 /** 行动执行结果 */
