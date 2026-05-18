@@ -31,6 +31,7 @@ interface FrontendPublicState {
   logs: Array<{ id: string; round: number; phase: string; text: string }>;
   resolutionPath: string | null;
   roundLocations: Record<string, string[]>;
+  resonance?: { id: string; name: string; desc: string };
 }
 
 interface FrontendPlayerState {
@@ -87,11 +88,10 @@ function pressureLabel(tier: number): string {
 interface TargetInfo { id: string; name: string; hint: string; }
 
 const TARGETS_UP: TargetInfo[] = [
-  { id: "basement", name: "教堂地下室", hint: "灰白盐痕的源头 · 石碑所在" },
-  { id: "morgue", name: "临时停尸房", hint: "死者的遗言 · 尸检记录" },
-  { id: "archives", name: "值夜者档案室", hint: "被借走的旧案记录" },
-  { id: "church_perimeter", name: "教堂周边街区", hint: "巡夜人证词矛盾点" },
-  { id: "spirit_realm", name: "灵界边缘", hint: "不散的残响" },
+  { id: "basement", name: "教堂地下室", hint: "灰白盐痕的源头 · 石碑所在 · 需灵性≥4" },
+  { id: "morgue", name: "临时停尸房", hint: "死者的遗言 · 尸检记录 · 需洞察≥4" },
+  { id: "archives", name: "值夜者档案室", hint: "被借走的旧案记录 · 需意志≥3" },
+  { id: "church_perimeter", name: "教堂周边街区", hint: "巡夜人证词矛盾点 · 需洞察≥3" },
 ];
 
 const TARGETS_DOWN: TargetInfo[] = [
@@ -159,6 +159,8 @@ export function RoomClient({ roomCode }: { roomCode: string }) {
   const [perceptionText, setPerceptionText] = useState<string | null>(null);
   const [chatMessages, setChatMessages] = useState<Array<{ id: string; senderName: string; text: string }>>([]);
   const [chatInput, setChatInput] = useState("");
+  const [diceLog, setDiceLog] = useState<Array<{ time: string; text: string }>>([]);
+  const [diceLogOpen, setDiceLogOpen] = useState(false);
 
   const roleId = state?.roleId ?? "";
 
@@ -214,6 +216,12 @@ export function RoomClient({ roomCode }: { roomCode: string }) {
     if (state?.lastOutcome && state.lastOutcome.privateNarrative !== lastShownOutcome) {
       setDiceModal(state.lastOutcome);
       setLastShownOutcome(state.lastOutcome.privateNarrative);
+      // 记录到骰子日志
+      const tierLabel = { revelation: "天启", success: "成功", partial: "勉强", failure: "失败", catastrophe: "灾厄" }[state.lastOutcome.checkOutcome.tier] ?? "?";
+      setDiceLog((prev) => [...prev.slice(-9), {
+        time: new Date().toLocaleTimeString(),
+        text: `${state.lastOutcome.storyletTitle} · D20=${state.lastOutcome.checkOutcome.d20Roll} → ${tierLabel}`,
+      }]);
     }
   }, [state?.lastOutcome]);
 
@@ -278,8 +286,25 @@ export function RoomClient({ roomCode }: { roomCode: string }) {
     (p) => p.id === state?.selfPlayerId
   );
 
+  const corruption = state?.corruption ?? 0;
+  const isTainted = corruption >= 3;
+  const isEroded = corruption >= 7;
+
   return (
-    <div style={{ minHeight: "100vh", background: "#0d1117", color: "#e6edf3", fontFamily: "system-ui, sans-serif" }}>
+    <div style={{
+      minHeight: "100vh", background: isEroded ? "#0a0505" : isTainted ? "#0d0a0a" : "#0d1117",
+      color: "#e6edf3", fontFamily: "system-ui, sans-serif",
+      transition: "background 0.5s",
+      boxShadow: isEroded ? "inset 0 0 80px rgba(180,30,30,0.15)" : "none",
+    }}>
+      {isEroded && (
+        <div style={{ position: "fixed", inset: 0, pointerEvents: "none", zIndex: 998,
+          background: "repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(255,0,0,0.03) 3px, rgba(255,0,0,0.03) 4px)" }} />
+      )}
+      {isTainted && (
+        <div style={{ position: "fixed", inset: 0, pointerEvents: "none", zIndex: 998,
+          background: "radial-gradient(ellipse at center, transparent 60%, rgba(0,0,0,0.3) 100%)" }} />
+      )}
       {/* ── 顶部 HUD ── */}
       <header style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 20px", borderBottom: "1px solid #30363d", background: "#161b22" }}>
         <div>
@@ -296,6 +321,11 @@ export function RoomClient({ roomCode }: { roomCode: string }) {
           {state && (
             <span style={{ background: state.publicState.pressureTier >= 3 ? "#f8514922" : "#d4a57422", color: state.publicState.pressureTier >= 3 ? "#f85149" : "#d4a574", padding: "4px 10px", borderRadius: 4, fontSize: 13 }}>
               ⚡ {pressureLabel(state.publicState.pressureTier)}
+            </span>
+          )}
+          {state?.publicState?.resonance && (
+            <span title={state.publicState.resonance.desc} style={{ background: "#8b5cf622", color: "#8b5cf6", padding: "4px 10px", borderRadius: 4, fontSize: 12, cursor: "help" }}>
+              🪨 {state.publicState.resonance.name}
             </span>
           )}
         </div>
@@ -334,20 +364,26 @@ export function RoomClient({ roomCode }: { roomCode: string }) {
           {(state?.privateClueTexts?.length ?? 0) > 0 && (
             <div style={{ marginTop: 12, background: "#161b22", border: "1px solid #30363d", borderRadius: 8, padding: 16 }}>
               <div style={{ fontSize: 13, color: "#d4a574", marginBottom: 8 }}>📋 私密发现</div>
-              {state?.privateClueTexts?.map((ct) => (
-                <div key={ct.id} style={{ fontSize: 11, color: "#c9d1d9", padding: "6px 0", borderBottom: "1px solid #30363d", lineHeight: 1.5 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <span style={{ color: "#d4a574", fontWeight: 600 }}>{ct.title}</span>
-                    <button
-                      onClick={() => getSocket().emit("game:share_clue", { roomCode, clueId: ct.id })}
-                      style={{ background: "#23863622", border: "1px solid #23863644", color: "#3fb950", borderRadius: 4, padding: "2px 6px", fontSize: 10, cursor: "pointer" }}
-                    >
-                      📢 公开
-                    </button>
+              {state?.privateClueTexts?.map((ct: any) => {
+                const currentRound = state.publicState?.round ?? 0;
+                const isDeteriorating = ct.round && (currentRound - ct.round) >= 2;
+                return (
+                  <div key={ct.id} style={{ fontSize: 11, color: isDeteriorating ? "#f85149" : "#c9d1d9", padding: "6px 0", borderBottom: "1px solid #30363d", lineHeight: 1.5 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span style={{ color: isDeteriorating ? "#f85149" : "#d4a574", fontWeight: 600 }}>
+                        {isDeteriorating ? "⚠️ " : ""}{ct.title}
+                      </span>
+                      <button
+                        onClick={() => getSocket().emit("game:share_clue", { roomCode, clueId: ct.id })}
+                        style={{ background: "#23863622", border: "1px solid #23863644", color: "#3fb950", borderRadius: 4, padding: "2px 6px", fontSize: 10, cursor: "pointer" }}
+                      >
+                        📢 公开
+                      </button>
+                    </div>
+                    <div style={{ color: "#8b949e", marginTop: 2 }}>{ct.text.length > 80 ? ct.text.slice(0, 80) + "..." : ct.text}</div>
                   </div>
-                  <div style={{ color: "#8b949e", marginTop: 2 }}>{ct.text.length > 80 ? ct.text.slice(0, 80) + "..." : ct.text}</div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
 
@@ -361,6 +397,19 @@ export function RoomClient({ roomCode }: { roomCode: string }) {
               ))}
             </div>
           )}
+
+          {/* 骰子日志 */}
+          <div style={{ marginTop: 12, background: "#161b22", border: "1px solid #30363d", borderRadius: 8, padding: 16 }}>
+            <div style={{ fontSize: 12, color: "#8b949e", cursor: "pointer", userSelect: "none" }}
+              onClick={() => setDiceLogOpen((v) => !v)}>
+              🎲 掷骰记录 ({diceLog.length}) {diceLogOpen ? "▲" : "▼"}
+            </div>
+            {diceLogOpen && diceLog.map((entry, i) => (
+              <div key={i} style={{ fontSize: 10, color: "#8b949e", padding: "2px 0", borderBottom: "1px solid #1a1f2b" }}>
+                {entry.time} {entry.text}
+              </div>
+            ))}
+          </div>
         </aside>
 
         {/* 中间：主舞台 */}
@@ -678,6 +727,10 @@ export function RoomClient({ roomCode }: { roomCode: string }) {
                     <button onClick={() => handleVote("compromise")}
                       style={{ padding: "12px 24px", background: "#30363d", color: "#8b949e", border: "1px solid #484f58", borderRadius: 8, cursor: "pointer", fontSize: 14, maxWidth: 200 }}>
                       🤝 妥协封存<br /><span style={{ fontSize: 11, opacity: 0.7 }}>控制局面，暂不公开全部真相</span>
+                    </button>
+                    <button onClick={() => handleVote("sacrifice")}
+                      style={{ padding: "12px 24px", background: "#f8514922", color: "#f85149", border: "1px solid #f8514944", borderRadius: 8, cursor: "pointer", fontSize: 14, maxWidth: 200 }}>
+                      🕯️ 锚点献祭<br /><span style={{ fontSize: 11, opacity: 0.7 }}>牺牲个人结局，换取团队大胜</span>
                     </button>
                   </div>
                 </div>

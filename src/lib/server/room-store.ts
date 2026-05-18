@@ -267,8 +267,15 @@ class RoomStore {
 
     // 讨论结束进入 resolution 后，等待收束决策
     if (room.gameState.phase === "resolution" && !room.gameState.resolutionPath) {
-      const choice = vote.targetPlayerId as "seal" | "reveal" | "compromise" | undefined;
-      if (choice && ["seal", "reveal", "compromise"].includes(choice)) {
+      const choice = vote.targetPlayerId as "seal" | "reveal" | "compromise" | "sacrifice" | undefined;
+      if (choice === "sacrifice") {
+        // 锚点献祭：牺牲投票者个人议程，结局升级至 perfect
+        const playerIdx = room.gameState.players.findIndex((p) => p.id === vote.playerId);
+        if (playerIdx !== -1) {
+          room.gameState.players[playerIdx].agendaCompleted = false;
+        }
+        room.gameState = resolveEnding(room.gameState, "seal");
+      } else if (choice && ["seal", "reveal", "compromise"].includes(choice)) {
         room.gameState = resolveEnding(room.gameState, choice);
       }
     }

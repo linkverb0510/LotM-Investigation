@@ -351,7 +351,7 @@ export interface InvestigatorState {
   /** 持有的私密线索 ID 列表 */
   privateClueIds: string[];
   /** 私密线索的叙事文本（仅对持有者可见） */
-  privateClueTexts: Array<{ id: string; title: string; text: string }>;
+  privateClueTexts: Array<{ id: string; title: string; text: string; round?: number }>;
   /** 已完成的个人议程 */
   agendaCompleted: boolean;
   /** 本轮是否已提交行动 */
@@ -396,6 +396,8 @@ export interface InvestigationGameState {
   gameState?: unknown;
   /** 本轮各调查地点的行动者列表（用于合作检测） */
   roundLocations: Record<string, string[]>;
+  /** 石碑共振频率（每局随机） */
+  resonance?: { id: string; name: string; desc: string };
 }
 
 /** 行动执行结果 */

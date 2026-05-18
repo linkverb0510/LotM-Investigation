@@ -207,6 +207,15 @@ export function createInvestigationGame(
   const gameState = new GameState();
   goldenPath.attachToGameState(gameState);
 
+  // 动态压力·石碑共振
+  const resonances = [
+    { id: "fear", name: "恐惧共振", desc: "石碑的低频辐射以「恐惧」为载波——洞察检定难度+1，灾厄额外污染+1", insightMod: 1 },
+    { id: "cognition", name: "认知干扰", desc: "石碑的辐射干扰了逻辑思维——知识检定难度+1，勉强结果降为失败", loreMod: 1 },
+    { id: "turbulence", name: "灵性湍流", desc: "石碑不稳定的灵性脉冲——所有检定难度+1，但灵性消耗减半", allMod: 1 },
+    { id: "silence", name: "异常沉寂", desc: "石碑处于低功率状态——本局无额外难度修正，基准难度-1", allMod: -1 },
+  ];
+  const resonance = resonances[Math.floor(Math.random() * resonances.length)];
+
   const state: InvestigationGameState = {
     roomCode,
     phase: "briefing",
@@ -230,6 +239,7 @@ export function createInvestigationGame(
     resolutionPath: null,
     dispatchedStoryletIds: [],
     roundLocations: {},
+    resonance: { id: resonance.id, name: resonance.name, desc: resonance.desc },
   };
 
   internalsMap.set(state, { goldenPath, gameState });
@@ -355,7 +365,7 @@ export function executePlayerAction(
       player.privateClueIds = [...player.privateClueIds, storylet.id];
       player.privateClueTexts = [
         ...player.privateClueTexts,
-        { id: storylet.id, title: storylet.title, text: checkOutcome.resolvedText },
+        { id: storylet.id, title: storylet.title, text: checkOutcome.resolvedText, round: state.round },
       ];
     }
   }
@@ -719,6 +729,7 @@ export function serializePublicState(state: InvestigationGameState) {
     logs: state.logs,
     resolutionPath: state.resolutionPath,
     roundLocations: state.roundLocations,
+    resonance: state.resonance,
   };
 }
 
