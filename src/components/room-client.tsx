@@ -322,7 +322,7 @@ export function RoomClient({ roomCode }: { roomCode: string }) {
                   </div>
                 )}
                 <div style={{ marginTop: 12, fontSize: 12, color: "#8b949e" }}>
-                  灵性 {state.spirituality}/{state.maxSpirituality} · 污染 {currentPlayer?.corruption ?? 0}/10
+                  灵性 {state.spirituality}/{state.maxSpirituality} · 污染 {state.corruption}/10
                 </div>
               </>
             ) : (
