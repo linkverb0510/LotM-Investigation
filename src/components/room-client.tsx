@@ -723,30 +723,29 @@ export function RoomClient({ roomCode }: { roomCode: string }) {
         }}>
           {state.privateHand.map((card) => {
             const style = getCardStyle(card);
+            const isSelected = selectedCard?.id === card.id;
             return (
-            <div
-              key={card.id}
-              onClick={() => {
-                if (currentPlayer?.hasActed) {
-                  setError("本轮已行动");
-                  return;
-                }
-                setSelectedCard(card);
-              }}
-              style={{
-                background: selectedCard?.id === card.id ? "#1f6feb22" : style.bg,
-                border: `2px solid ${selectedCard?.id === card.id ? "#58a6ff" : style.color + "44"}`,
-                borderLeft: `4px solid ${style.color}`,
-                borderRadius: 8, padding: "10px 14px", cursor: "pointer",
-                minWidth: 160, maxWidth: 200,
-                transition: "border-color 0.15s",
-              }}
-            >
-              <div style={{ fontSize: 14, fontWeight: 600 }}>{style.icon} {card.name}</div>
-              <div style={{ fontSize: 11, color: style.color, marginTop: 2 }}>{card.cost.spirituality} 灵性</div>
-              <div style={{ fontSize: 11, color: "#8b949e", marginTop: 4, lineHeight: 1.4 }}>{card.description}</div>
-            </div>
-          ))}
+              <div
+                key={card.id}
+                onClick={() => {
+                  if (currentPlayer?.hasActed) { setError("本轮已行动"); return; }
+                  setSelectedCard(card);
+                }}
+                style={{
+                  background: isSelected ? "#1f6feb22" : style.bg,
+                  border: `2px solid ${isSelected ? "#58a6ff" : style.color + "44"}`,
+                  borderLeft: `4px solid ${style.color}`,
+                  borderRadius: 8, padding: "10px 14px", cursor: "pointer",
+                  minWidth: 160, maxWidth: 200,
+                  transition: "border-color 0.15s",
+                }}
+              >
+                <div style={{ fontSize: 14, fontWeight: 600 }}>{style.icon} {card.name}</div>
+                <div style={{ fontSize: 11, color: style.color, marginTop: 2 }}>{card.cost.spirituality} 灵性</div>
+                <div style={{ fontSize: 11, color: "#8b949e", marginTop: 4, lineHeight: 1.4 }}>{card.description}</div>
+              </div>
+            );
+          })}
           {selectedCard && !currentPlayer?.hasActed && (
             <button
               onClick={() => handlePlayCard(selectedCard)}
