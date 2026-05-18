@@ -354,6 +354,8 @@ export interface InvestigatorState {
   agendaCompleted: boolean;
   /** 本轮是否已提交行动 */
   hasActed: boolean;
+  /** P0 开场感知文本（基于角色最高属性生成） */
+  firstLook?: string;
 }
 
 /** 一局调查的完整游戏状态 */

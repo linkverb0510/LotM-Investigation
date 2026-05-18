@@ -18,8 +18,7 @@ interface FrontendRoom {
 interface FrontendPlayer {
   id: string; name: string; isHost: boolean; isConnected: boolean;
   roleName: string; roleTitle: string; roleOrg: string;
-  spirituality: number; maxSpirituality: number; corruption: number;
-  handCount: number; hasActed: boolean;
+  hasActed: boolean;
 }
 
 interface FrontendPublicState {
@@ -45,6 +44,7 @@ interface FrontendPlayerState {
   maxSpirituality: number;
   corruption: number;
   agendaCompleted: boolean;
+  firstLook: string;
   selfPlayerId: string;
   readyPlayers: string[];
 }
@@ -275,6 +275,18 @@ export function RoomClient({ roomCode }: { roomCode: string }) {
           {inBriefing && (
             <div style={{ textAlign: "center", padding: 40 }}>
               <h2 style={{ fontSize: 22, color: "#d4a574" }}>P0 案情简报</h2>
+
+              {/* 角色第一眼 */}
+              {state?.firstLook && (
+                <div style={{
+                  maxWidth: 600, margin: "20px auto", padding: 20,
+                  background: "#161b22", border: "1px solid #30363d", borderRadius: 10,
+                  textAlign: "left", lineHeight: 1.9, fontSize: 14, color: "#c9d1d9",
+                }}>
+                  {state.firstLook}
+                </div>
+              )}
+
               <p style={{ color: "#8b949e", marginTop: 12 }}>阅读你的角色信息和私密隐情，准备就绪。</p>
               {!isReady ? (
                 <button onClick={handleReady} disabled={readySubmitting}
@@ -341,11 +353,8 @@ export function RoomClient({ roomCode }: { roomCode: string }) {
                   }}>
                     <div style={{ fontSize: 14, fontWeight: 600 }}>{p.name}</div>
                     <div style={{ fontSize: 12, color: "#8b949e" }}>{p.roleName} · {p.roleTitle}</div>
-                    <div style={{ fontSize: 11, color: "#d4a574", marginTop: 4 }}>
-                      灵 {p.spirituality}/{p.maxSpirituality} · 污 {p.corruption}/10
-                    </div>
                     {p.hasActed && <div style={{ fontSize: 11, color: "#3fb950", marginTop: 4 }}>✅ 已行动</div>}
-                    {state.publicState.readyPlayers?.length > 0 && <div style={{ fontSize: 11, color: "#8b949e", marginTop: 2 }}>🃏 {p.handCount}张</div>}
+                    {!p.hasActed && <div style={{ fontSize: 11, color: "#8b949e", marginTop: 4 }}>⏳ 行动中</div>}
                   </div>
                 ))}
               </div>

@@ -114,6 +114,7 @@ export function createInvestigationGame(
       privateClueIds: [],
       agendaCompleted: false,
       hasActed: false,
+      firstLook: generateFirstLook(role.id),
     };
   });
 
@@ -322,6 +323,17 @@ export function resolveActionRound(
         ...next.logs,
         { id: uid(), round: next.round, phase: newPhase, text: `【阶段推进】进入 ${newPhase}` },
       ];
+      // 破冰讨论提示
+      if (newPhase === "discussion_1") {
+        next.discussionTopic = "各位已完成了第一轮调查。你注意到的异常值得向其他人说明——或许他们看见了你不曾看见的东西。";
+        next.logs = [
+          ...next.logs,
+          { id: uid(), round: next.round, phase: newPhase, text: "💬【讨论开始】分享你的发现，比较彼此看到的不同——真相可能存在于碎片之间。" },
+        ];
+      }
+      if (newPhase === "discussion_2") {
+        next.discussionTopic = "局势正在恶化。基于目前的全部发现，决定——谁最适合执行最终处置？";
+      }
     }
   }
 
@@ -454,11 +466,8 @@ export function serializePublicState(state: InvestigationGameState) {
       roleName: p.roleName,
       roleTitle: p.roleTitle,
       roleOrg: p.roleOrg,
-      spirituality: p.spirituality,
-      maxSpirituality: p.maxSpirituality,
-      corruption: p.corruption,
-      handCount: p.hand.length,
       hasActed: p.hasActed,
+      // 灵性/污染/手牌数 仅对自己可见（serializePlayerState）
     })),
     publicClueIds: state.publicClueIds,
     discussionTopic: state.discussionTopic,
@@ -483,7 +492,31 @@ export function serializePlayerState(
     maxSpirituality: player?.maxSpirituality ?? 0,
     corruption: player?.corruption ?? 0,
     agendaCompleted: player?.agendaCompleted ?? false,
+    firstLook: player?.firstLook ?? "",
   };
+}
+
+// ══════════════════════════════════════════════════
+//  P0 开场感知
+// ══════════════════════════════════════════════════
+
+/** 为每个角色生成开场「第一眼」文本（基于最高属性） */
+function generateFirstLook(roleId: string): string {
+  const lookMap: Record<string, string> = {
+    "role-01-edwin":
+      "你在教堂街口停下了脚步。不是因为看见了什么——是因为一种你太熟悉的沉默。三年前那座教堂在封井之后的夜晚，也是这种沉默。你的指尖在本能地摩挲着怀表的边缘。你知道那种感觉：有什么东西在下面，不是死了，只是等了太久。",
+    "role-02-lyle":
+      "你比其他人晚到了几分钟——是你故意安排的。你在街对面的阴影里站了一会儿，观察着门口聚集的人群。两个值夜者，一个代罚者，一张贵族面孔，还有那个你在地下聚会上见过一次的巫师。没人注意到你。你注意到了两件事：门口的石阶上有不易察觉的新鲜划痕，和空气里有一股只有你闻得到的烧焦纸页的气味。",
+    "role-03-austen":
+      "你的航海家直觉在你踏进东区的那一刻就开始响个不停。不是暴风雨前的那种压迫——是更糟的一种。是船在深夜航行时，海面平静得像镜子，但所有的鱼都在往深水里逃的那种感觉。你下意识地确认了一下风暴教会徽记的位置。那不是怕——那是准备。",
+    "role-04-cecilia":
+      "你在来这里的马车上翻了一遍那份精神援助评估报告。八个证人的情绪描述。七个的用词几乎可以互换。不是相似——是复制。真正的恐惧不会这么整齐。你的观众途径让你的手指在纸面上多停了一秒——不是因为你看出了什么，是因为你怀疑自己在害怕看出什么。",
+    "role-05-devlin":
+      "你比别人更早感觉到地下室的存在——不是通过灵界视野，而是通过一阵不应该存在的寒意。通灵者的直觉让你在踏进东区的时候就意识到：今晚的死者不止那些被报告上去的。有什么东西在灵界中留下了声音，不是残响，是等待。",
+    "role-06-elias":
+      "你在翻阅案卷的第一页就看到了那段祷文。不是因为它完整——是因为它不完整。有人在拷贝的时候刻意删掉了一些词句，但保留的部分中有一个赫密斯语的倒装结构，而那种倒装只出现在第四纪仪式文本中。你不需要翻译它。你需要决定什么时候告诉别人你知道它意味着什么。",
+  };
+  return lookMap[roleId] ?? "你被召集到东区，参与一场异常死亡案的调查。空气中弥漫着大雾霾的残余——和一种你无法命名的紧张。";
 }
 
 // ══════════════════════════════════════════════════
