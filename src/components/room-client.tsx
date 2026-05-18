@@ -136,6 +136,8 @@ export function RoomClient({ roomCode }: { roomCode: string }) {
   const [lastShownOutcome, setLastShownOutcome] = useState("");
   const [abilityResult, setAbilityResult] = useState<string | null>(null);
   const [perceptionText, setPerceptionText] = useState<string | null>(null);
+  const [chatMessages, setChatMessages] = useState<Array<{ id: string; senderName: string; text: string }>>([]);
+  const [chatInput, setChatInput] = useState("");
 
   const roleId = state?.roleId ?? "";
 
@@ -172,12 +174,17 @@ export function RoomClient({ roomCode }: { roomCode: string }) {
       setPerceptionText(payload.text);
     });
 
+    socket.on("room:chat", (msg: { id: string; senderName: string; text: string }) => {
+      setChatMessages((prev) => [...prev, msg]);
+    });
+
     return () => {
       socket.off("room:updated");
       socket.off("game:state");
       socket.off("server:error");
       socket.off("game:ability_result");
       socket.off("game:ability_perceived");
+      socket.off("room:chat");
     };
   }, [roomCode]);
 
@@ -225,6 +232,12 @@ export function RoomClient({ roomCode }: { roomCode: string }) {
 
   const handleAbility = (abilityId: string, targetPlayerId: string) => {
     getSocket().emit("game:ability", { roomCode, abilityId, targetPlayerId });
+  };
+
+  const sendChat = () => {
+    if (!chatInput.trim()) return;
+    getSocket().emit("game:chat", { roomCode, text: chatInput.trim() });
+    setChatInput("");
   };
 
   const startGame = () => {
@@ -460,8 +473,46 @@ export function RoomClient({ roomCode }: { roomCode: string }) {
 
           {/* 讨论阶段 */}
           {inDiscussion && (
-            <div style={{ textAlign: "center", padding: 40 }}>
-              <h2 style={{ fontSize: 20, color: "#d4a574" }}>案件讨论</h2>
+            <div style={{ padding: 20 }}>
+              <h2 style={{ fontSize: 20, color: "#d4a574", textAlign: "center" }}>案件讨论</h2>
+
+              {/* 聊天区域 */}
+              <div style={{
+                maxWidth: 700, margin: "16px auto", background: "#161b22", border: "1px solid #30363d",
+                borderRadius: 10, height: 260, overflow: "auto", padding: 12,
+              }}>
+                {chatMessages.length === 0 && (
+                  <div style={{ color: "#484f58", fontSize: 13, textAlign: "center", padding: 40 }}>
+                    暂无发言——你是第一个打破沉默的人吗？
+                  </div>
+                )}
+                {chatMessages.map((msg) => (
+                  <div key={msg.id} style={{ padding: "4px 0", borderBottom: "1px solid #1a1f2b" }}>
+                    <span style={{ color: "#d4a574", fontSize: 12, fontWeight: 600 }}>{msg.senderName}: </span>
+                    <span style={{ color: "#c9d1d9", fontSize: 13 }}>{msg.text}</span>
+                  </div>
+                ))}
+              </div>
+
+              {/* 聊天输入 */}
+              <div style={{ maxWidth: 700, margin: "8px auto", display: "flex", gap: 8 }}>
+                <input
+                  style={{
+                    flex: 1, background: "#0d1117", border: "1px solid #30363d", color: "#c9d1d9",
+                    padding: "8px 12px", borderRadius: 6, fontSize: 13, outline: "none",
+                  }}
+                  placeholder="分享你的发现..."
+                  value={chatInput}
+                  onChange={(e) => setChatInput(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") sendChat(); }}
+                />
+                <button
+                  onClick={sendChat}
+                  style={{ padding: "8px 16px", background: "#238636", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 13 }}
+                >
+                  发送
+                </button>
+              </div>
 
               {/* 途径能力 */}
               {roleId === "role-04-cecilia" && (

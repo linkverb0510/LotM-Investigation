@@ -243,8 +243,11 @@ export function executePlayerAction(
   // 修正难度为实际计算值
   checkOutcome.difficulty = difficulty;
 
-  // 选择结果文本
-  const resolvedText = pickResultText(storylet, checkOutcome);
+  if (!storylet) {
+    checkOutcome.resolvedText = "你在这个区域进行了常规调查，但所有显著线索都已被发现。或许该换个地方——或者推动团队进入下一阶段。";
+  } else {
+    checkOutcome.resolvedText = pickResultText(storylet, checkOutcome);
+  }
 
   // 更新玩家状态
   player.spirituality -= checkOutcome.spiritCost;
@@ -264,11 +267,11 @@ export function executePlayerAction(
     if (storylet.scope === "public" && checkOutcome.tier !== "catastrophe") {
       newPublicClueIds.push(clueId);
     } else if (storylet.scope === "private") {
-      newPrivateClue = resolvedText;
+      newPrivateClue = checkOutcome.resolvedText;
       player.privateClueIds = [...player.privateClueIds, storylet.id];
       player.privateClueTexts = [
         ...player.privateClueTexts,
-        { id: storylet.id, title: storylet.title, text: resolvedText },
+        { id: storylet.id, title: storylet.title, text: checkOutcome.resolvedText },
       ];
     }
   }
@@ -287,11 +290,11 @@ export function executePlayerAction(
 
   const outcome: ActionOutcome = {
     playerId: player.id,
-    checkOutcome: { ...checkOutcome, resolvedText },
+    checkOutcome: { ...checkOutcome },
     storyletId: storylet?.id ?? "",
     storyletTitle: storylet?.title ?? "常规调查",
     publicRollSummary: rollSummary,
-    privateNarrative: resolvedText,
+    privateNarrative: checkOutcome.resolvedText,
     newPublicClueIds,
     newPrivateClue,
     triggeredEventId: checkOutcome.triggerEventId,
@@ -320,7 +323,7 @@ export function executePlayerAction(
               id: uid(),
               round: state.round,
               phase: state.phase,
-              text: `📜【${storylet?.title ?? "发现"}】${resolvedText}`,
+              text: `📜【${storylet?.title ?? "发现"}】${checkOutcome.resolvedText}`,
             },
           ]
         : []),
@@ -361,6 +364,17 @@ export function resolveActionRound(
   }
 
   next.players = next.players.map((p) => ({ ...p, hasActed: false }));
+
+  // 补牌：从角色专属卡池中补回手牌至3张
+  next.players = next.players.map((p) => {
+    const role = investigationV2Roles.find((r) => r.id === p.roleId);
+    if (!role || p.hand.length >= role.startStats.startHand) return p;
+    const pool = role.signatureCards.filter((c) => !p.hand.some((h) => h.id === c.id));
+    const needed = role.startStats.startHand - p.hand.length;
+    const drawn = pool.slice(0, needed);
+    return { ...p, hand: [...p.hand, ...drawn] };
+  });
+
   next.roundLocations = {}; // 重置本轮回合追踪
 
   if (coopInsights.length > 0) {
@@ -390,10 +404,15 @@ export function resolveActionRound(
       ];
       // 破冰讨论提示
       if (newPhase === "discussion_1") {
-        next.discussionTopic = "各位已完成了第一轮调查。你注意到的异常值得向其他人说明——或许他们看见了你不曾看见的东西。";
+        // 根据已发现的线索生成讨论问题
+        const discussionQuestions = generateDiscussionQuestions(next);
+        next.discussionTopic = discussionQuestions.length > 0
+          ? discussionQuestions.join("  |  ")
+          : "各位已完成了第一轮调查。你注意到的异常值得向其他人说明——或许他们看见了你不曾看见的东西。";
         next.logs = [
           ...next.logs,
           { id: uid(), round: next.round, phase: newPhase, text: "💬【讨论开始】分享你的发现，比较彼此看到的不同——真相可能存在于碎片之间。" },
+          ...discussionQuestions.map((q) => ({ id: uid(), round: next.round, phase: newPhase, text: `❓ ${q}` })),
         ];
       }
       if (newPhase === "discussion_2") {
@@ -963,6 +982,27 @@ function findMatchingStorylet(
   }
 
   return null;
+}
+
+/** 根据已发现的公共线索生成讨论问题 */
+function generateDiscussionQuestions(state: InvestigationGameState): string[] {
+  const clueQuestionMap: Record<string, string> = {
+    "clue_seed-public-salt-spread": "地下室的灰白盐痕是不完整的仪式圆弧——为什么它没有被完成？",
+    "clue_seed-public-missing-page": "尸检最后一页被灵性火焰销毁——谁在我们到达之前接触过档案室？",
+    "clue_seed-public-watchman-contradiction": "巡夜人为什么无意识地偏离了巡逻路线？他本人是否意识到了？",
+    "clue_seed-public-salt-expansion": "盐痕在自行向外生长——这意味着仪式是否需要外部干预就能完成？",
+    "clue_seed-public-second-body": "第二名死者的手势不属于任何现存教会——它来自哪里？",
+    "clue_seed-public-artifacts-resonance": "三件封印物同时指向教堂地下——异常源的等级至少是多少？",
+    "clue_seed-public-missing-archives": "三年前的档案被借走从未归还——借阅人是谁？教会高层是否知情？",
+    "clue_seed-public-nightmare-wave": "居民共同噩梦中的祷文是什么语言？为什么普通人能听到它？",
+    "clue_seed-public-charity-route": "慈善点位像一张向地下收束的网——谁设计了这张网？",
+  };
+  const questions: string[] = [];
+  for (const cid of state.publicClueIds) {
+    const q = clueQuestionMap[cid];
+    if (q && !questions.includes(q)) questions.push(q);
+  }
+  return questions.slice(0, 2); // 最多2个问题
 }
 
 function pickResultText(
