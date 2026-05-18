@@ -182,6 +182,8 @@ export function confirmReady(
     next.phase = "investigation_up";
     next.round = 1;
     next.activePlayerId = next.players[0]?.id ?? null;
+    // 同步 GoldenPath 阶段
+    getInternals(next).goldenPath.currentPhase = "investigation_up";
     next.logs = [
       ...next.logs,
       { id: uid(), round: 1, phase: "investigation_up", text: "全员准备就绪，调查开始。" },
@@ -338,6 +340,8 @@ export function resolveActionRound(
   state: InvestigationGameState
 ): InvestigationGameState {
   let next = cloneState(state, { pendingActions: [] });
+  const engInternals = getInternals(next);
+  next.logs = [...next.logs, { id: uid(), round: next.round, phase: next.phase, text: `[引擎] resolveActionRound: canAdvance=${engInternals.goldenPath.canAdvancePhase()} progress=${engInternals.goldenPath.getProgress().overallProgress}` }];
 
   // 重置 hasActed + 检测合作
   const coopInsights: string[] = [];
@@ -375,10 +379,9 @@ export function resolveActionRound(
   next.pressureTier = Math.min(5, next.pressureTier + 1);
 
   // 检查阶段推进
-  const internals = getInternals(state);
-  internals.goldenPath.tickAnomaly(2);
-  if (internals.goldenPath.canAdvancePhase()) {
-    const newPhase = internals.goldenPath.advancePhase();
+  engInternals.goldenPath.tickAnomaly(2);
+  if (engInternals.goldenPath.canAdvancePhase()) {
+    const newPhase = engInternals.goldenPath.advancePhase();
     if (newPhase) {
       next.phase = newPhase;
       next.logs = [

@@ -245,7 +245,8 @@ class RoomStore {
     const { state } = executePlayerAction(room.gameState, engineAction);
     room.gameState = state;
 
-    // 检查是否全员完成行动
+    console.log(`[applyTurnAction] pending=${room.gameState.pendingActions.length}/${room.gameState.players.length}`);
+
     if (room.gameState.pendingActions.length === room.gameState.players.length) {
       room.gameState = resolveActionRound(room.gameState);
     }
