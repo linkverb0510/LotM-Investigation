@@ -1,0 +1,27 @@
+# build
+.next
+node_modules
+*.tsbuildinfo
+dist
+
+# env
+.env
+.env.local
+
+# test
+coverage
+.playwright-cli/
+
+# database
+prisma/dev.db
+prisma/migrations/
+
+# logs
+*.log
+
+# opencode
+.opencode/
+
+# OS
+Thumbs.db
+.DS_Store
