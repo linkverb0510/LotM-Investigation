@@ -96,6 +96,16 @@ export class GoldenPath {
     this.completedAnchors.add(anchorId);
   }
 
+  /** 通过Storylet ID标记锚点(引擎便利方法) */
+  tryMarkAnchorByStorylet(storyletId: string): void {
+    const anchors = this.definition.phaseAnchors[this.currentPhase] ?? [];
+    for (const a of anchors) {
+      if (a.targetStoryletIds.includes(storyletId)) {
+        this.completedAnchors.add(a.anchorId);
+      }
+    }
+  }
+
   /** 检查指定锚点是否已完成 */
   isAnchorComplete(anchorId: string): boolean {
     return this.completedAnchors.has(anchorId);

@@ -356,6 +356,9 @@ export function executePlayerAction(
     const clueId = `clue_${storylet.id}`;
     dispatched.push(storylet.id);
 
+    // GoldenPath锚点标记
+    getInternals(state).goldenPath.tryMarkAnchorByStorylet(storylet.id);
+
     if (storylet.scope === "public" && checkOutcome.tier !== "catastrophe") {
       newPublicClueIds.push(clueId);
       // 添加物品到背包
@@ -1176,11 +1179,6 @@ export function getAvailableTargets(phase: string): InvestigationTarget[] {
   if (phase === "investigation_down") {
     // P3：全部开放
     return all;
-  }
-  return [];
-}
-  if (phase === "investigation_down") {
-    return all; // P3 所有目标可用
   }
   return [];
 }
