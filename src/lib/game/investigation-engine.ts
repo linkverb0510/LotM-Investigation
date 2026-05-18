@@ -547,10 +547,19 @@ export function resolveActionRound(
     const nextPhase = state.phase === "investigation_up" ? "discussion_1" as PhaseHint
       : state.phase === "investigation_down" ? "discussion_2" as PhaseHint
       : null;
-    if (nextPhase) {
-      next.phase = nextPhase;
-      engInternals.goldenPath.currentPhase = nextPhase;
-    }
+      if (nextPhase) {
+        next.phase = nextPhase;
+        engInternals.goldenPath.currentPhase = nextPhase;
+        // 讨论议题
+        if (nextPhase === "discussion_1") {
+          const qs = generateDiscussionQuestions(next);
+          next.discussionTopic = qs.length > 0 ? qs.join(" | ") : "你注意到了一些异常——或许其他人看见了你不曾看见的东西。";
+          next.logs = [...next.logs, { id: uid(), round: next.round, phase: nextPhase, text: "💬【讨论开始】分享你的发现。" }];
+        }
+        if (nextPhase === "discussion_2") {
+          next.discussionTopic = "局势正在恶化。决定谁最适合执行最终处置。";
+        }
+      }
   }
       if (newPhase === "discussion_2") {
         next.discussionTopic = "局势正在恶化。基于目前的全部发现，决定——谁最适合执行最终处置？";
