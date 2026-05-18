@@ -350,12 +350,16 @@ export interface InvestigatorState {
   corruption: number;
   /** 持有的私密线索 ID 列表 */
   privateClueIds: string[];
+  /** 私密线索的叙事文本（仅对持有者可见） */
+  privateClueTexts: Array<{ id: string; title: string; text: string }>;
   /** 已完成的个人议程 */
   agendaCompleted: boolean;
   /** 本轮是否已提交行动 */
   hasActed: boolean;
   /** P0 开场感知文本（基于角色最高属性生成） */
   firstLook?: string;
+  /** 最近一次行动的结果（仅对本人可见，用于前端弹窗） */
+  lastOutcome?: ActionOutcome | null;
 }
 
 /** 一局调查的完整游戏状态 */

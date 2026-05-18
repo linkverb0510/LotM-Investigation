@@ -36,6 +36,7 @@ interface FrontendPlayerState {
   publicState: FrontendPublicState;
   privateHand: FrontendCard[];
   privateClueIds: string[];
+  privateClueTexts: Array<{ id: string; title: string; text: string }>;
   roleId: string;
   roleName: string;
   roleOrg: string;
@@ -47,6 +48,14 @@ interface FrontendPlayerState {
   firstLook: string;
   selfPlayerId: string;
   readyPlayers: string[];
+  lastOutcome?: {
+    playerId: string;
+    storyletTitle: string;
+    publicRollSummary: string;
+    privateNarrative: string;
+    newPublicClueIds: string[];
+    checkOutcome: { tier: string; d20Roll: number; finalResult: number; difficulty: number };
+  } | null;
 }
 
 // ── 辅助函数 ──
@@ -86,6 +95,28 @@ const TARGETS_DOWN: TargetInfo[] = [
   { id: "charity_office", name: "慈善项目办公室", hint: "亚瑟的签名 · 被安排的路线" },
 ];
 
+// ── 线索 ID → 标题映射 ──
+
+const CLUE_LABELS: Record<string, { title: string; desc: string }> = {
+  "clue_seed-public-salt-spread": { title: "灰白盐痕", desc: "地下室地面的不完整仪式圆弧" },
+  "clue_seed-public-missing-page": { title: "尸检缺页", desc: "被灵性火焰销毁的最后一页" },
+  "clue_seed-public-watchman-contradiction": { title: "证词矛盾", desc: "巡夜人无意识偏离巡逻路线" },
+  "clue_seed-public-salt-expansion": { title: "盐痕扩散", desc: "灰白结晶在自行向外生长" },
+  "clue_seed-public-second-body": { title: "第二名死者", desc: "非教会的异常祷告手势" },
+  "clue_seed-public-artifacts-resonance": { title: "封印物同源", desc: "三件封印物同时指向教堂地下" },
+  "clue_seed-public-missing-archives": { title: "旧案档案空缺", desc: "三年前的文件被人借走从未归还" },
+  "clue_seed-public-nightmare-wave": { title: "共同噩梦", desc: "居民做着相同的梦" },
+  "clue_seed-public-charity-route": { title: "被安排的路线", desc: "慈善点位像一张向地下收束的网" },
+};
+
+function getClueLabel(cid: string): string {
+  return CLUE_LABELS[cid]?.title ?? cid.replace("clue_seed-public-", "").replace(/-/g, " ");
+}
+
+function getClueDesc(cid: string): string {
+  return CLUE_LABELS[cid]?.desc ?? "";
+}
+
 // ═══════════════════════════════════════
 //  主组件
 // ═══════════════════════════════════════
@@ -98,6 +129,8 @@ export function RoomClient({ roomCode }: { roomCode: string }) {
   const [selectedTargetId, setSelectedTargetId] = useState<string | null>(null);
   const [readySubmitting, setReadySubmitting] = useState(false);
   const [voteSubmitting, setVoteSubmitting] = useState(false);
+  const [diceModal, setDiceModal] = useState<FrontendPlayerState["lastOutcome"] | null>(null);
+  const [lastShownOutcome, setLastShownOutcome] = useState("");
 
   // ── 连接 ──
 
@@ -130,6 +163,14 @@ export function RoomClient({ roomCode }: { roomCode: string }) {
       socket.off("server:error");
     };
   }, [roomCode]);
+
+  // 检测新的 lastOutcome 并弹出骰子结果
+  useEffect(() => {
+    if (state?.lastOutcome && state.lastOutcome.privateNarrative !== lastShownOutcome) {
+      setDiceModal(state.lastOutcome);
+      setLastShownOutcome(state.lastOutcome.privateNarrative);
+    }
+  }, [state?.lastOutcome]);
 
   // ── 操作 ──
 
@@ -235,12 +276,13 @@ export function RoomClient({ roomCode }: { roomCode: string }) {
           </div>
 
           {/* 私密线索 */}
-          {(state?.privateClueIds?.length ?? 0) > 0 && (
+          {(state?.privateClueTexts?.length ?? 0) > 0 && (
             <div style={{ marginTop: 12, background: "#161b22", border: "1px solid #30363d", borderRadius: 8, padding: 16 }}>
               <div style={{ fontSize: 13, color: "#d4a574", marginBottom: 8 }}>📋 你的私密发现</div>
-              {state?.privateClueIds?.map((cid) => (
-                <div key={cid} style={{ fontSize: 11, color: "#8b949e", padding: "4px 0", borderBottom: "1px solid #30363d" }}>
-                  {cid.replace("clue_seed-public-", "").replace(/-/g, " ")}
+              {state?.privateClueTexts?.map((ct) => (
+                <div key={ct.id} style={{ fontSize: 11, color: "#c9d1d9", padding: "6px 0", borderBottom: "1px solid #30363d", lineHeight: 1.5 }}>
+                  <span style={{ color: "#d4a574", fontWeight: 600 }}>{ct.title}</span>
+                  <div style={{ color: "#8b949e", marginTop: 2 }}>{ct.text.length > 80 ? ct.text.slice(0, 80) + "..." : ct.text}</div>
                 </div>
               ))}
             </div>
@@ -388,13 +430,36 @@ export function RoomClient({ roomCode }: { roomCode: string }) {
           {inResolution && (
             <div style={{ textAlign: "center", padding: 40 }}>
               <h2 style={{ fontSize: 24, color: "#d4a574" }}>案件收束</h2>
-              <p style={{ color: "#8b949e", marginTop: 16, maxWidth: 600, margin: "16px auto", lineHeight: 1.8 }}>
-                {state?.publicState?.resolutionPath === "perfect"
-                  ? "石碑被重新封印，旧案报告重见天日。真相抵达了该抵达的人。"
-                  : state?.publicState?.resolutionPath === "compromise"
-                  ? "事情被压住了，名字被保住了。但你们都知道，还有什么东西停在封签后面。"
-                  : "崩坏不是结束，而是那句低语变得更安静、更不肯离开的开始。"}
-              </p>
+
+              {state?.publicState?.resolutionPath ? (
+                <p style={{ color: "#8b949e", marginTop: 16, maxWidth: 600, margin: "16px auto", lineHeight: 1.8 }}>
+                  {state.publicState.resolutionPath === "perfect"
+                    ? "石碑被重新封印，旧案报告重见天日。真相抵达了该抵达的人。"
+                    : state.publicState.resolutionPath === "compromise"
+                    ? "事情被压住了，名字被保住了。但你们都知道，还有什么东西停在封签后面。"
+                    : "崩坏不是结束，而是那句低语变得更安静、更不肯离开的开始。"}
+                </p>
+              ) : (
+                <div>
+                  <p style={{ color: "#8b949e", marginTop: 16, maxWidth: 500, margin: "16px auto" }}>
+                    调查已进入最后阶段。局势不可逆转。你和其他调查员必须做出最终决定——如何处置这块石碑？
+                  </p>
+                  <div style={{ display: "flex", gap: 12, justifyContent: "center", marginTop: 24, flexWrap: "wrap" }}>
+                    <button onClick={() => handleVote("seal")}
+                      style={{ padding: "12px 24px", background: "#1f6feb", color: "#fff", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 14, maxWidth: 200 }}>
+                      🔒 封印石碑<br /><span style={{ fontSize: 11, opacity: 0.7 }}>联合执行高阶封印程序</span>
+                    </button>
+                    <button onClick={() => handleVote("reveal")}
+                      style={{ padding: "12px 24px", background: "#d4a574", color: "#0d1117", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 14, maxWidth: 200 }}>
+                      📖 揭露真相<br /><span style={{ fontSize: 11, opacity: 0.7 }}>公开旧案报告与亚瑟的关联</span>
+                    </button>
+                    <button onClick={() => handleVote("compromise")}
+                      style={{ padding: "12px 24px", background: "#30363d", color: "#8b949e", border: "1px solid #484f58", borderRadius: 8, cursor: "pointer", fontSize: 14, maxWidth: 200 }}>
+                      🤝 妥协封存<br /><span style={{ fontSize: 11, opacity: 0.7 }}>控制局面，暂不公开全部真相</span>
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </section>
@@ -406,14 +471,12 @@ export function RoomClient({ roomCode }: { roomCode: string }) {
             {(state?.publicState?.publicClueIds?.length ?? 0) === 0 ? (
               <div style={{ fontSize: 12, color: "#8b949e" }}>暂无公开线索</div>
             ) : (
-              state?.publicState?.publicClueIds?.map((cid) => {
-                const label = cid.replace("clue_seed-public-", "").replace(/-/g, " ");
-                return (
-                  <div key={cid} style={{ fontSize: 11, color: "#c9a96e", padding: "6px 0", borderBottom: "1px solid #30363d" }}>
-                    📜 {label}
-                  </div>
-                );
-              })
+              state?.publicState?.publicClueIds?.map((cid) => (
+                <div key={cid} style={{ fontSize: 11, padding: "6px 0", borderBottom: "1px solid #30363d" }}>
+                  <div style={{ color: "#d4a574", fontWeight: 600 }}>📜 {getClueLabel(cid)}</div>
+                  <div style={{ color: "#8b949e", marginTop: 2 }}>{getClueDesc(cid)}</div>
+                </div>
+              ))
             )}
           </div>
 
@@ -474,6 +537,62 @@ export function RoomClient({ roomCode }: { roomCode: string }) {
             <div style={{ alignSelf: "center", color: "#3fb950", fontSize: 14 }}>✅ 本轮已行动 — 等待下一轮</div>
           )}
         </footer>
+      )}
+
+      {/* ── 骰子结果弹窗 ── */}
+      {diceModal && (
+        <div
+          style={{
+            position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 1000,
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }}
+          onClick={() => setDiceModal(null)}
+        >
+          <div
+            style={{
+              background: "#161b22", border: "1px solid #30363d", borderRadius: 14,
+              padding: 28, maxWidth: 500, width: "90%", textAlign: "center",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ color: "#8b949e", fontSize: 13, marginBottom: 8 }}>{diceModal.storyletTitle}</div>
+            <div style={{
+              fontSize: 36, fontWeight: 800, margin: "12px 0",
+              color: diceModal.checkOutcome.tier === "revelation" ? "#d4a574" :
+                     diceModal.checkOutcome.tier === "success" ? "#3fb950" :
+                     diceModal.checkOutcome.tier === "partial" ? "#d29922" :
+                     diceModal.checkOutcome.tier === "catastrophe" ? "#f85149" : "#8b949e",
+            }}>
+              🎲 {diceModal.checkOutcome.d20Roll}
+            </div>
+            <div style={{ fontSize: 14, color: "#c9d1d9", marginBottom: 8 }}>
+              D20={diceModal.checkOutcome.d20Roll} + 属性 → {diceModal.checkOutcome.finalResult} vs 难度{diceModal.checkOutcome.difficulty}
+            </div>
+            <div style={{
+              fontSize: 16, fontWeight: 700, marginBottom: 16,
+              color: diceModal.checkOutcome.tier === "revelation" ? "#d4a574" :
+                     diceModal.checkOutcome.tier === "success" ? "#3fb950" :
+                     diceModal.checkOutcome.tier === "catastrophe" ? "#f85149" : "#d29922",
+            }}>
+              {diceModal.checkOutcome.tier === "revelation" ? "✨ 天启" :
+               diceModal.checkOutcome.tier === "success" ? "✅ 成功" :
+               diceModal.checkOutcome.tier === "partial" ? "⚡ 勉强" :
+               diceModal.checkOutcome.tier === "catastrophe" ? "💀 灾厄" : "❌ 失败"}
+            </div>
+            <div style={{ textAlign: "left", lineHeight: 1.8, fontSize: 13, color: "#c9d1d9", maxHeight: 200, overflow: "auto", padding: "0 4px" }}>
+              {diceModal.privateNarrative}
+            </div>
+            {diceModal.newPublicClueIds.length > 0 && (
+              <div style={{ marginTop: 12, fontSize: 12, color: "#3fb950" }}>📌 新公共线索已添加到线索板</div>
+            )}
+            <button
+              onClick={() => setDiceModal(null)}
+              style={{ marginTop: 20, padding: "8px 24px", background: "#30363d", color: "#c9d1d9", border: "1px solid #484f58", borderRadius: 6, cursor: "pointer", fontSize: 14 }}
+            >
+              关闭
+            </button>
+          </div>
+        </div>
       )}
 
       {/* ── 错误提示 ── */}

@@ -277,9 +277,12 @@ class RoomStore {
     };
     room.gameState = submitVote(room.gameState, engineVote);
 
-    // 讨论结束进入 resolution 后自动结算结局
+    // 讨论结束进入 resolution 后，等待收束决策
     if (room.gameState.phase === "resolution" && !room.gameState.resolutionPath) {
-      room.gameState = resolveEnding(room.gameState);
+      const choice = vote.targetPlayerId as "seal" | "reveal" | "compromise" | undefined;
+      if (choice && ["seal", "reveal", "compromise"].includes(choice)) {
+        room.gameState = resolveEnding(room.gameState, choice);
+      }
     }
 
     return room;

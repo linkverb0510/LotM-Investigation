@@ -112,6 +112,7 @@ export function createInvestigationGame(
       maxSpirituality: role.startStats.maxSpirituality,
       corruption: role.startStats.startCorruption,
       privateClueIds: [],
+      privateClueTexts: [],
       agendaCompleted: false,
       hasActed: false,
       firstLook: generateFirstLook(role.id),
@@ -242,6 +243,10 @@ export function executePlayerAction(
     } else if (storylet.scope === "private") {
       newPrivateClue = resolvedText;
       player.privateClueIds = [...player.privateClueIds, storylet.id];
+      player.privateClueTexts = [
+        ...player.privateClueTexts,
+        { id: storylet.id, title: storylet.title, text: resolvedText },
+      ];
     }
   }
 
@@ -270,7 +275,7 @@ export function executePlayerAction(
   };
 
   const players = [...state.players];
-  players[playerIdx] = player;
+  players[playerIdx] = { ...player, lastOutcome: outcome }; // 存储结果供前端弹窗
 
   const nextState: InvestigationGameState = {
     ...state,
@@ -378,16 +383,22 @@ export function submitVote(
 // ══════════════════════════════════════════════════
 
 export function resolveEnding(
-  state: InvestigationGameState
+  state: InvestigationGameState,
+  choice?: "seal" | "reveal" | "compromise"
 ): InvestigationGameState {
   let path: "perfect" | "compromise" | "collapse" = "compromise";
 
-  const internals = getInternals(state);
-  const progress = internals.goldenPath.getProgress();
-  if (progress) {
-    if (progress.overallProgress >= 70 && progress.truthNodeConnections >= 20) {
+  // 玩家有选择时，以选择为准
+  if (choice === "seal") path = "perfect";
+  else if (choice === "reveal") path = "perfect";
+  else if (choice === "compromise") path = "compromise";
+  else {
+    // 无选择时按进度自动判定
+    const internals = getInternals(state);
+    const progress = internals.goldenPath.getProgress();
+    if (progress && progress.overallProgress >= 70 && progress.truthNodeConnections >= 20) {
       path = "perfect";
-    } else if (progress.overallProgress >= 50) {
+    } else if (progress && progress.overallProgress >= 50) {
       path = "compromise";
     } else {
       path = "collapse";
@@ -486,6 +497,7 @@ export function serializePlayerState(
     publicState: serializePublicState(state),
     privateHand: player?.hand.map(adaptCard) ?? [],
     privateClueIds: player?.privateClueIds ?? [],
+    privateClueTexts: player?.privateClueTexts ?? [],
     roleId: player?.roleId ?? "",
     attributes: player?.attributes ?? null,
     spirituality: player?.spirituality ?? 0,
@@ -493,6 +505,7 @@ export function serializePlayerState(
     corruption: player?.corruption ?? 0,
     agendaCompleted: player?.agendaCompleted ?? false,
     firstLook: player?.firstLook ?? "",
+    lastOutcome: player?.lastOutcome ?? null,
   };
 }
 
