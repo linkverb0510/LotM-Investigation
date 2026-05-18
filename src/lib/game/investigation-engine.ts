@@ -201,6 +201,11 @@ export function executePlayerAction(
   state: InvestigationGameState,
   action: PlayerAction
 ): { state: InvestigationGameState; outcome: ActionOutcome | null } {
+  // 回合制：仅当前行动者可操作
+  if (state.activePlayerId && action.playerId !== state.activePlayerId) {
+    return { state, outcome: null };
+  }
+
   const playerIdx = state.players.findIndex((p) => p.id === action.playerId);
   if (playerIdx === -1) return { state, outcome: null };
 
@@ -314,6 +319,8 @@ export function executePlayerAction(
     players,
     publicClueIds: [...state.publicClueIds, ...newPublicClueIds],
     pendingActions: [...state.pendingActions, action],
+    // 推进到下一位行动者
+    activePlayerId: getNextActivePlayer(state, action.playerId),
     logs: [
       ...state.logs,
       { id: uid(), round: state.round, phase: state.phase, text: rollSummary },
@@ -333,6 +340,17 @@ export function executePlayerAction(
   });
 
   return { state: nextState, outcome };
+}
+
+/** 获取下一位未行动的行动者 */
+function getNextActivePlayer(state: InvestigationGameState, currentPlayerId: string): string | null {
+  const currentIdx = state.players.findIndex((p) => p.id === currentPlayerId);
+  for (let i = 1; i <= state.players.length; i++) {
+    const idx = (currentIdx + i) % state.players.length;
+    const p = state.players[idx];
+    if (!p.hasActed) return p.id;
+  }
+  return null; // 全员已行动
 }
 
 // ══════════════════════════════════════════════════
@@ -375,7 +393,10 @@ export function resolveActionRound(
     return { ...p, hand: [...p.hand, ...drawn] };
   });
 
-  next.roundLocations = {}; // 重置本轮回合追踪
+  next.roundLocations = {};
+
+  // 重置回合行动者
+  next.activePlayerId = next.players[0]?.id ?? null; // 重置本轮回合追踪
 
   if (coopInsights.length > 0) {
     next.logs = [
@@ -495,12 +516,28 @@ export function resolveEnding(
   // 结算个人议程
   const next = resolveAgendas(cloneState(state, { resolutionPath: path }), path);
 
+  // 生成角色结局独白
+  const characterEndingLogs = next.players.map((p) => {
+    const endingStorylet = investigationV2StoryletSeeds.find(
+      (s) => s.scope === "ending" && s.affectedRoles?.includes(p.roleId)
+    );
+    const text = endingStorylet?.textSeed ?? "";
+    return { id: uid(), round: state.round, phase: "resolution" as const, text: `👤【${p.roleName}】${text}` };
+  });
+
+  // 公共收束叙事
+  const publicEndingId = `seed-ending-${path}`;
+  const publicEndingStorylet = investigationV2StoryletSeeds.find((s) => s.id === publicEndingId);
+  const publicEndingText = publicEndingStorylet?.textSeed ?? "";
+
   return {
     ...next,
     phase: "resolution",
     logs: [
       ...state.logs,
       { id: uid(), round: state.round, phase: "resolution", text: `【结局】${endLogText}` },
+      ...(publicEndingText ? [{ id: uid(), round: state.round, phase: "resolution" as const, text: `📜【案件收束】${publicEndingText}` }] : []),
+      ...characterEndingLogs,
     ],
   };
 }
