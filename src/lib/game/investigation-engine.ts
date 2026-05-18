@@ -318,6 +318,12 @@ export function executePlayerAction(
           (op) => op.id !== player.id && op.privateClueIds.includes(storylet.id)
         )
       : false,
+    // 同地点协作：有其他人已在此调查 → 难度-1
+    coopAssist: state.roundLocations[action.targetId]?.length > 0 ? 1 : 0,
+    // 秘密捷径：持有该目标相关的私密线索 → 难度-4
+    hasRelatedItem: player.privateClueIds.some((cid) =>
+      storylet?.relatedTruthMapIds?.some((tid) => cid.includes(tid))
+    ),
   });
 
   // 掷骰
@@ -502,6 +508,23 @@ export function resolveActionRound(
       coopInsights.push(
         `${names.join("和")}在【${targetName}】分别从不同角度进行了调查——他们的发现互相印证了更深层的线索。`
       );
+
+      // 共生线索：检查互补私密线索
+      const players = playerIds.map((pid) => state.players.find((p) => p.id === pid)).filter(Boolean);
+      if (players.length >= 2) {
+        for (let i = 0; i < players.length; i++) {
+          for (let j = i + 1; j < players.length; j++) {
+            const a = players[i]!;
+            const b = players[j]!;
+            const sharedClues = a.privateClueIds.filter((cid) => b.privateClueIds.includes(cid));
+            if (sharedClues.length > 0) {
+              coopInsights.push(
+                `🔗【共生线索】${a.roleName}和${b.roleName}各自持有的私密发现指向了同一真相——某些碎片只有在拼在一起时才会显露全貌。`
+              );
+            }
+          }
+        }
+      }
     }
   }
 
@@ -1111,6 +1134,8 @@ export interface InvestigationTarget {
   hint: string;
   /** 关联的 Storylet ID 列表（优先匹配） */
   storyletIds: string[];
+  /** 里层解锁条件（需表层调查完成） */
+  deepStoryletIds?: string[];
 }
 
 /** 全案调查目标 */
@@ -1119,54 +1144,38 @@ export const INVESTIGATION_TARGETS: Record<string, InvestigationTarget> = {
     id: "basement",
     name: "教堂地下室",
     hint: "灰白盐痕的源头 · 石碑所在",
-    storyletIds: [
-      "seed-public-salt-spread",
-      "seed-public-salt-expansion",
-      "seed-public-artifacts-resonance",
-    ],
+    storyletIds: ["seed-public-salt-spread", "seed-public-salt-expansion"],
+    deepStoryletIds: ["seed-public-artifacts-resonance"],
   },
   morgue: {
     id: "morgue",
     name: "临时停尸房",
     hint: "死者的最后遗言 · 尸检记录",
-    storyletIds: [
-      "seed-public-missing-page",
-      "seed-public-second-body",
-    ],
+    storyletIds: ["seed-public-missing-page", "seed-public-second-body"],
   },
   archives: {
     id: "archives",
     name: "值夜者档案室",
     hint: "被借走三年的旧案记录",
-    storyletIds: [
-      "seed-public-missing-archives",
-      "seed-private-edwin-griffin-record",
-    ],
+    storyletIds: ["seed-public-missing-archives", "seed-private-edwin-griffin-record"],
   },
   church_perimeter: {
     id: "church_perimeter",
     name: "教堂周边街区",
     hint: "巡夜人证词的矛盾点 · 灵性引导标记",
-    storyletIds: [
-      "seed-public-watchman-contradiction",
-      "seed-public-charity-route",
-    ],
+    storyletIds: ["seed-public-watchman-contradiction", "seed-public-charity-route"],
   },
   charity_office: {
     id: "charity_office",
     name: "慈善项目办公室",
     hint: "亚瑟签名的所在 · 被安排的路线",
-    storyletIds: [
-      "seed-public-charity-route",
-    ],
+    storyletIds: ["seed-public-charity-route"],
   },
   spirit_realm: {
     id: "spirit_realm",
     name: "灵界边缘",
     hint: "通灵者能听到的低语 · 不散的残响",
-    storyletIds: [
-      "seed-public-nightmare-wave",
-    ],
+    storyletIds: ["seed-public-nightmare-wave"],
   },
 };
 
@@ -1202,6 +1211,7 @@ function findMatchingStorylet(
 
   // 1. 优先：该目标关联的 Storylet + 匹配 phase + 匹配属性
   if (target) {
+    // 先检查表层
     let candidates = pool.filter(
       (s) =>
         s.phaseHint === state.phase &&
@@ -1211,6 +1221,18 @@ function findMatchingStorylet(
     );
     if (candidates.length > 0) {
       return candidates[Math.floor(Math.random() * candidates.length)];
+    }
+    // 表层已耗尽 → 检查里层（难度+2，线索更完整）
+    if (target.deepStoryletIds) {
+      candidates = pool.filter(
+        (s) =>
+          s.phaseHint === state.phase &&
+          target.deepStoryletIds!.includes(s.id) &&
+          !dispatched.has(s.id)
+      );
+      if (candidates.length > 0) {
+        return candidates[Math.floor(Math.random() * candidates.length)];
+      }
     }
   }
 
