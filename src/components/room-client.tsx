@@ -134,6 +134,10 @@ export function RoomClient({ roomCode }: { roomCode: string }) {
   const [voteSubmitting, setVoteSubmitting] = useState(false);
   const [diceModal, setDiceModal] = useState<FrontendPlayerState["lastOutcome"] | null>(null);
   const [lastShownOutcome, setLastShownOutcome] = useState("");
+  const [abilityResult, setAbilityResult] = useState<string | null>(null);
+  const [perceptionText, setPerceptionText] = useState<string | null>(null);
+
+  const roleId = state?.roleId ?? "";
 
   // ── 连接 ──
 
@@ -160,10 +164,20 @@ export function RoomClient({ roomCode }: { roomCode: string }) {
       setVoteSubmitting(false);
     });
 
+    socket.on("game:ability_result", (payload: { resultText: string }) => {
+      setAbilityResult(payload.resultText);
+    });
+
+    socket.on("game:ability_perceived", (payload: { text: string }) => {
+      setPerceptionText(payload.text);
+    });
+
     return () => {
       socket.off("room:updated");
       socket.off("game:state");
       socket.off("server:error");
+      socket.off("game:ability_result");
+      socket.off("game:ability_perceived");
     };
   }, [roomCode]);
 
@@ -207,6 +221,10 @@ export function RoomClient({ roomCode }: { roomCode: string }) {
   const handleVote = (targetId: string) => {
     setVoteSubmitting(true);
     getSocket().emit("game:vote", { roomCode, targetPlayerId: targetId });
+  };
+
+  const handleAbility = (abilityId: string, targetPlayerId: string) => {
+    getSocket().emit("game:ability", { roomCode, abilityId, targetPlayerId });
   };
 
   const startGame = () => {
@@ -444,6 +462,41 @@ export function RoomClient({ roomCode }: { roomCode: string }) {
           {inDiscussion && (
             <div style={{ textAlign: "center", padding: 40 }}>
               <h2 style={{ fontSize: 20, color: "#d4a574" }}>案件讨论</h2>
+
+              {/* 途径能力 */}
+              {roleId === "role-04-cecilia" && (
+                <div style={{ marginTop: 16 }}>
+                  <span style={{ color: "#8b949e", fontSize: 12 }}>🔍 观众途径 · 情绪窥探：</span>
+                  {state?.publicState?.players?.filter(p => p.id !== state.selfPlayerId).map((p) => (
+                    <button key={p.id} onClick={() => handleAbility("cecilia-empathy-read", p.id)}
+                      style={{ margin: 4, padding: "4px 12px", background: "#d4a57422", color: "#d4a574", border: "1px solid #d4a57444", borderRadius: 6, cursor: "pointer", fontSize: 12 }}>
+                      读取 {p.roleName}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {roleId === "role-01-edwin" && (
+                <div style={{ marginTop: 16 }}>
+                  <span style={{ color: "#8b949e", fontSize: 12 }}>🌙 不眠者途径 · 梦境触碰：</span>
+                  {state?.publicState?.players?.filter(p => p.id !== state.selfPlayerId).map((p) => (
+                    <button key={p.id} onClick={() => handleAbility("edwin-dream-touch", p.id)}
+                      style={{ margin: 4, padding: "4px 12px", background: "#58a6ff22", color: "#58a6ff", border: "1px solid #58a6ff44", borderRadius: 6, cursor: "pointer", fontSize: 12 }}>
+                      触碰 {p.roleName}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {roleId === "role-06-elias" && (
+                <div style={{ marginTop: 16 }}>
+                  <span style={{ color: "#8b949e", fontSize: 12 }}>👁️ 窥秘人途径 · 灵体观察：</span>
+                  {state?.publicState?.players?.filter(p => p.id !== state.selfPlayerId).map((p) => (
+                    <button key={p.id} onClick={() => handleAbility("elias-aura-scan", p.id)}
+                      style={{ margin: 4, padding: "4px 12px", background: "#d2992222", color: "#d29922", border: "1px solid #d2992244", borderRadius: 6, cursor: "pointer", fontSize: 12 }}>
+                      观察 {p.roleName}
+                    </button>
+                  ))}
+                </div>
+              )}
               <p style={{ color: "#8b949e", marginTop: 8 }}>
                 {state?.publicState?.discussionTopic ?? "根据当前发现，讨论并决定下一步行动。"}
               </p>
@@ -636,6 +689,35 @@ export function RoomClient({ roomCode }: { roomCode: string }) {
             >
               关闭
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── 途径能力结果弹窗 ── */}
+      {abilityResult && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" }}
+          onClick={() => setAbilityResult(null)}>
+          <div style={{ background: "#161b22", border: "1px solid #d4a57444", borderRadius: 14, padding: 24, maxWidth: 450, width: "90%" }}
+            onClick={(e) => e.stopPropagation()}>
+            <div style={{ color: "#d4a574", fontSize: 14, fontWeight: 600, marginBottom: 12 }}>🔍 探查结果</div>
+            <div style={{ color: "#c9d1d9", fontSize: 13, lineHeight: 1.8 }}>{abilityResult}</div>
+            <button onClick={() => setAbilityResult(null)}
+              style={{ marginTop: 16, padding: "8px 24px", background: "#30363d", color: "#c9d1d9", border: "1px solid #484f58", borderRadius: 6, cursor: "pointer", fontSize: 14 }}>关闭</button>
+          </div>
+        </div>
+      )}
+
+      {/* ── 被动感知弹窗 ── */}
+      {perceptionText && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" }}
+          onClick={() => setPerceptionText(null)}>
+          <div style={{ background: "#161b22", border: "1px solid #58a6ff44", borderRadius: 14, padding: 24, maxWidth: 450, width: "90%" }}
+            onClick={(e) => e.stopPropagation()}>
+            <div style={{ color: "#58a6ff", fontSize: 14, fontWeight: 600, marginBottom: 12 }}>🌙 被动感知</div>
+            <div style={{ color: "#c9d1d9", fontSize: 13, lineHeight: 1.8 }}>{perceptionText}</div>
+            <div style={{ color: "#8b949e", fontSize: 11, marginTop: 12 }}>你不知道是谁在窥探——但你知道有人在看着你。</div>
+            <button onClick={() => setPerceptionText(null)}
+              style={{ marginTop: 16, padding: "8px 24px", background: "#30363d", color: "#c9d1d9", border: "1px solid #484f58", borderRadius: 6, cursor: "pointer", fontSize: 14 }}>关闭</button>
           </div>
         </div>
       )}

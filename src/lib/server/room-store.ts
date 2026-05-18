@@ -293,6 +293,19 @@ class RoomStore {
     return this.rooms.get(_roomCode.toUpperCase())!;
   }
 
+  // [V2] 讨论阶段途径能力
+  applyPathwayAbility(roomCode: string, playerId: string, abilityId: string, targetPlayerId: string): { room: StoredRoom; resultText: string; targetPerception: string } | null {
+    const room = this.rooms.get(roomCode.toUpperCase());
+    if (!room?.gameState) throw new Error("Game not found.");
+
+    const { usePathwayAbility } = require("@/lib/game/investigation-engine");
+    const result = usePathwayAbility(room.gameState, playerId, abilityId, targetPlayerId);
+    if (!result) return null;
+
+    room.gameState = result.state;
+    return { room, resultText: result.resultText, targetPerception: result.targetPerception };
+  }
+
   // [Dev Mode] 处理开发者指令
   handleDevCommand(roomCode: string, playerId: string, command: string): StoredRoom {
     const room = this.rooms.get(roomCode.toUpperCase());

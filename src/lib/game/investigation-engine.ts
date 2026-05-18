@@ -577,8 +577,174 @@ function generateFirstLook(roleId: string): string {
 }
 
 // ══════════════════════════════════════════════════
-//  个人议程
+//  讨论途径能力
 // ══════════════════════════════════════════════════
+
+/** 讨论阶段途径能力定义 */
+interface PathwayAbility {
+  id: string;
+  name: string;
+  roleId: string;
+  /** 检定属性 */
+  attribute: Attribute;
+  /** 目标防御属性 */
+  defense: Attribute;
+  /** 基础难度 */
+  difficulty: number;
+  /** 结果文本（五档） */
+  results: Record<string, { userText: string; targetPerception: string }>;
+}
+
+const PATHWAY_ABILITIES: PathwayAbility[] = [
+  {
+    id: "cecilia-empathy-read",
+    name: "情绪窥探",
+    roleId: "role-04-cecilia",
+    attribute: "insight",
+    defense: "will",
+    difficulty: 12,
+    results: {
+      revelation: {
+        userText: "你看穿了对方的每一层伪装——他的镇定是反复练习的，他的回避是有具体方向的。你不仅知道他在隐藏什么，你还知道他为什么隐藏。",
+        targetPerception: "你感到一股锐利的洞察从对面的心理医生身上传来——她看穿了你。不是猜测，是确认。",
+      },
+      success: {
+        userText: "你的观众途径让你捕捉到了对方情绪中的一处断裂——他在某个问题上说了实话，但在另一个问题上收紧了所有微表情。你知道他在隐藏，但不确定具体是什么。",
+        targetPerception: "心理医生的目光在你身上多停留了一秒。她的表情没有任何变化，但你的直觉告诉你——她在读你。",
+      },
+      partial: {
+        userText: "对方的情绪结构比你预想的更复杂——你能感觉到混合着焦虑和警惕，但无法分离出具体哪一层是真实的。",
+        targetPerception: "一阵轻微的不安掠过你的意识——像是有人在黑暗中触碰了你一下，但随即消失。你不确定那是什么。",
+      },
+      failure: {
+        userText: "对方的表情控制远超你的预期——或者说，你的注意力被某种外部的灵性干扰分散了。你读不到任何有用的信息。",
+        targetPerception: "",
+      },
+      catastrophe: {
+        userText: "你读到了——但你读到的是一种不属于对方的平静。那种平静不是情绪控制，是来自外部的、像是被什么东西安抚过的「归顺」。你突然不确定那是对方的情绪还是石碑辐射对你的影响。污染+1。",
+        targetPerception: "你注意到心理医生的瞳孔在短暂扩张后猛地收缩——她看到了什么。不是关于你的。是关于这个房间。",
+      },
+    },
+  },
+  {
+    id: "edwin-dream-touch",
+    name: "梦境触碰",
+    roleId: "role-01-edwin",
+    attribute: "will",
+    defense: "will",
+    difficulty: 14,
+    results: {
+      revelation: {
+        userText: "你的梦魇能力在对方的意识表层捕捉到了一个反复出现的意象——不是梦，是记忆的残片。一个被反复压抑的画面：与旧教堂事件相关的某个瞬间。他不是在隐藏线索——他是在害怕自己回想起来的后果。",
+        targetPerception: "你突然想起了旧教堂事件中的一个细节——不是你自己主动想的，是像被什么东西从记忆深处拽出来的。你看向艾德温——他什么都没说，但他知道。",
+      },
+      success: {
+        userText: "你在对方意识边缘触到了一层反复按压过的痕迹——像一个被反复抚平的折角。他在刻意避开某个话题，而且避开的不是一次两次，是长期养成的习惯。",
+        targetPerception: "一阵轻微的困意掠过——然后你的思绪短暂地滑到了旧教堂事件上。你立刻收紧了意识。有人在碰你的记忆。",
+      },
+      partial: {
+        userText: "对方的意识结构比你预期的更警觉——你的触碰在接近某个关键记忆时被一层训练有素的防御弹开了。你只知道那里有东西，但不知道是什么。",
+        targetPerception: "你的值夜者训练在瞬间激活了警觉——有人在试图进入你的意识。你本能地关上了门，但你不确定那个触碰来自谁。",
+      },
+      failure: {
+        userText: "对方的意识像一面被反复擦拭过的镜子——你看不到任何残留的痕迹。不是因为干净，是因为被擦得太多次了。",
+        targetPerception: "",
+      },
+      catastrophe: {
+        userText: "你在试图深入对方意识时触到了一层不属于他的记忆——不是他的，是地下室的。石碑辐射在你们之间产生了一个短暂的灵性通道，你看到了一段画面：十七段祷文，十六段在发光，第十七段是空的。你猛地切断了连接。污染+1。",
+        targetPerception: "你短暂地失去了大约两秒钟的意识——然后你记起了地下室里的石碑。不是你想起来的——是它被塞进你的记忆里的。有人触碰了不该碰的东西。",
+      },
+    },
+  },
+  {
+    id: "elias-aura-scan",
+    name: "灵体观察",
+    roleId: "role-06-elias",
+    attribute: "lore",
+    defense: "aura",
+    difficulty: 10,
+    results: {
+      revelation: {
+        userText: "你的窥秘之眼在对方的以太体上看到了一个不该存在的结构——一层薄薄的灰白色灵性附着，频率与地下室石碑的辐射完全一致。他已经被影响了——他自己可能不知道。更关键的是，你看到他的星灵体有一道被反复灼烧的旧痕——三年前的仪式实验留下的。你知道他是谁了——格里芬实验的另一个参与者。",
+        targetPerception: "你感到一股不带情感的审视从巫师的方向传来——不是针对你的行为，是针对你的灵性结构本身。他在看你的以太体。",
+      },
+      success: {
+        userText: "对方的灵体结构在你眼中呈现出明显的异常——星灵体有不自然的波动痕迹，说明他接触过某种高强度的仪式残留。更关键的：这股波动频率与石碑的辐射有部分重叠。他不是最近被影响的——这个痕迹至少有两三年了。",
+        targetPerception: "巫师的目光在你身上停留了异常长的时间——他的瞳孔在快速微调焦距，像是在看你身上某个你看不见的层面。",
+      },
+      partial: {
+        userText: "对方的灵体在你眼中闪烁着不稳定的光泽——你能确认有异常存在，但异常的类型和来源超出了你的判断范围。可能是旧案残留，也可能是当前石碑辐射的影响。你需要更近距离的观察。",
+        targetPerception: "你感到一阵微弱的灵性波动从巫师的方向掠过——像是被一根看不见的手指轻轻戳了一下。他没有解释。",
+      },
+      failure: {
+        userText: "石碑的低频辐射污染了整个空间的灵性视野——你看每个人都像隔着一层灰白色的薄雾。你无法确认任何具体的异常。",
+        targetPerception: "",
+      },
+      catastrophe: {
+        userText: "你在扫描对方的灵体时，你的窥秘之眼突然自动锁定了地下室的方向——不是因为对方有问题，而是石碑的辐射在那一瞬间强到覆盖了所有人的灵性信号。你短暂地看到了所有人的以太体上都附着了一层相同的灰白色薄膜。污染+1。你无法确定你看到的异常是对方的还是你自己的。",
+        targetPerception: "巫师突然闭上了眼睛——然后猛地睁开。他看着你的方向，但焦点在你身后。你回头——什么都没有。",
+      },
+    },
+  },
+];
+
+/** 使用讨论途径能力 */
+export function usePathwayAbility(
+  state: InvestigationGameState,
+  playerId: string,
+  abilityId: string,
+  targetPlayerId: string
+): { state: InvestigationGameState; resultText: string; targetPerception: string } | null {
+  const ability = PATHWAY_ABILITIES.find((a) => a.id === abilityId);
+  if (!ability) return null;
+
+  const user = state.players.find((p) => p.id === playerId);
+  const target = state.players.find((p) => p.id === targetPlayerId);
+  if (!user || !target || user.roleId !== ability.roleId) return null;
+
+  // 魔术师免疫洞察窥探
+  if (ability.attribute === "insight" && target.roleId === "role-02-lyle") {
+    const resultText = "你试图读取对方的情绪——但魔术师的表情和肢体语言在你的观众途径面前像一面完美的镜子。你什么都读不到。他对表情的控制是你见过的最完美的——完美到你怀疑他是不是连自己都骗过去了。";
+    return { state, resultText, targetPerception: "" };
+  }
+
+  // 检定
+  const checkOutcome = resolveCheck(
+    { attribute: ability.attribute, baseDifficulty: ability.difficulty, coopAllowed: false },
+    user.roleId,
+    { characterCorruption: user.corruption }
+  );
+
+  // 目标被动感知
+  let targetPerception = "";
+  if (checkOutcome.tier !== "failure") {
+    const defOutcome = resolveCheck(
+      { attribute: ability.defense, baseDifficulty: 14, coopAllowed: false },
+      target.roleId,
+      { characterCorruption: target.corruption }
+    );
+    if (defOutcome.tier === "revelation" || defOutcome.tier === "success") {
+      targetPerception = ability.results[checkOutcome.tier]?.targetPerception ?? "";
+    }
+  }
+
+  const tier = checkOutcome.tier;
+  const resultText = ability.results[tier]?.userText ?? `你的${ability.name}未能获得明确信息。`;
+
+  // 灾厄追加污染
+  const players = state.players.map((p) => {
+    if (p.id === playerId && tier === "catastrophe") {
+      return { ...p, corruption: Math.min(10, p.corruption + 1) };
+    }
+    return p;
+  });
+
+  return {
+    state: { ...state, players },
+    resultText,
+    targetPerception,
+  };
+}
 
 /** 角色个人议程定义 */
 export interface CharacterAgenda {

@@ -202,6 +202,34 @@ export function registerSocketHandlers(io: Server): void {
       }
     });
 
+    // 讨论阶段途径能力
+    socket.on("game:ability", ({ roomCode, abilityId, targetPlayerId }: { roomCode: string; abilityId: string; targetPlayerId: string }) => {
+      try {
+        const { player } = roomStore.getPlayerBySocket(socket.id);
+        const result = roomStore.applyPathwayAbility(roomCode, player.id, abilityId, targetPlayerId);
+        if (result) {
+          // 向使用者发送私密结果
+          socket.emit("game:ability_result", {
+            resultText: result.resultText,
+            targetPerception: "",
+          });
+          // 向目标发送被动感知结果
+          if (result.targetPerception) {
+            const targetRoom = roomStore.getRoom(roomCode);
+            const targetPlayer = targetRoom?.players.find((p) => p.id === targetPlayerId);
+            if (targetPlayer) {
+              io.to(targetPlayer.socketId).emit("game:ability_perceived", {
+                text: result.targetPerception,
+              });
+            }
+          }
+        }
+        emitRoomSnapshot(io, roomCode);
+      } catch (error) {
+        socket.emit("server:error", error instanceof Error ? error.message : "Failed ability.");
+      }
+    });
+
 
     socket.on("game:chat", ({ roomCode, text }: { roomCode: string; text: string }) => {
       try {
