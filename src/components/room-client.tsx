@@ -50,6 +50,7 @@ interface FrontendPlayerState {
   agendaGoal: string;
   agendaResult: string;
   selfPlayerId: string;
+  inventory: Array<{ id: string; name: string; type: string }>;
   readyPlayers: string[];
   lastOutcome?: {
     playerId: string;
@@ -332,7 +333,7 @@ export function RoomClient({ roomCode }: { roomCode: string }) {
           {/* 私密线索 */}
           {(state?.privateClueTexts?.length ?? 0) > 0 && (
             <div style={{ marginTop: 12, background: "#161b22", border: "1px solid #30363d", borderRadius: 8, padding: 16 }}>
-              <div style={{ fontSize: 13, color: "#d4a574", marginBottom: 8 }}>📋 你的私密发现</div>
+              <div style={{ fontSize: 13, color: "#d4a574", marginBottom: 8 }}>📋 私密发现</div>
               {state?.privateClueTexts?.map((ct) => (
                 <div key={ct.id} style={{ fontSize: 11, color: "#c9d1d9", padding: "6px 0", borderBottom: "1px solid #30363d", lineHeight: 1.5 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -345,6 +346,17 @@ export function RoomClient({ roomCode }: { roomCode: string }) {
                     </button>
                   </div>
                   <div style={{ color: "#8b949e", marginTop: 2 }}>{ct.text.length > 80 ? ct.text.slice(0, 80) + "..." : ct.text}</div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {(state?.inventory?.length ?? 0) > 0 && (
+            <div style={{ marginTop: 12, background: "#161b22", border: "1px solid #30363d", borderRadius: 8, padding: 16 }}>
+              <div style={{ fontSize: 13, color: "#d4a574", marginBottom: 8 }}>🎒 证物背包</div>
+              {state?.inventory?.map((item) => (
+                <div key={item.id} style={{ fontSize: 11, color: "#d4a574", padding: "3px 0" }}>
+                  📎 {item.name}
                 </div>
               ))}
             </div>

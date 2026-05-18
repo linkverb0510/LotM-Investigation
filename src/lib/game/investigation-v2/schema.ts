@@ -362,6 +362,8 @@ export interface InvestigatorState {
   lastOutcome?: ActionOutcome | null;
   /** 个人议程目标文本（P0展示，P6结算） */
   agendaGoal?: string;
+  /** 物品背包 */
+  inventory: Array<{ id: string; name: string; type: string }>;
 }
 
 /** 一局调查的完整游戏状态 */

@@ -166,6 +166,7 @@ export function createInvestigationGame(
       privateClueIds: [],
       privateClueTexts: [],
       agendaCompleted: false,
+      inventory: [],
       hasActed: false,
       firstLook: generateFirstLook(role.id),
       agendaGoal: CHARACTER_AGENDAS[role.id]?.goal ?? "",
@@ -347,6 +348,8 @@ export function executePlayerAction(
 
     if (storylet.scope === "public" && checkOutcome.tier !== "catastrophe") {
       newPublicClueIds.push(clueId);
+      // 添加物品到背包
+      player.inventory = [...(player.inventory || []), { id: clueId, name: storylet.title, type: "evidence" as const }];
     } else if (storylet.scope === "private") {
       newPrivateClue = checkOutcome.resolvedText;
       player.privateClueIds = [...player.privateClueIds, storylet.id];
@@ -418,17 +421,47 @@ export function executePlayerAction(
   return { state: nextState, outcome };
 }
 
-/** 获取下一位未行动的行动者 */
-function getNextActivePlayer(state: InvestigationGameState, currentPlayerId: string): string | null {
-  const currentIdx = state.players.findIndex((p) => p.id === currentPlayerId);
-  for (let i = 1; i <= state.players.length; i++) {
-    const idx = (currentIdx + i) % state.players.length;
-    const p = state.players[idx];
-    if (!p.hasActed) return p.id;
+/** 被动感知：高洞察角色自动感知同地点他人的异常 */
+export function triggerPassivePerception(
+  state: InvestigationGameState
+): InvestigationGameState {
+  const perceptivePlayers = state.players.filter(
+    (p) => (p.attributes.insight >= 5 || p.attributes.aura >= 5) && p.hasActed
+  );
+  if (perceptivePlayers.length === 0) return state;
+
+  let next = state;
+  for (const observer of perceptivePlayers) {
+    const targetIds = state.roundLocations[observer.id]
+      ? Object.entries(state.roundLocations)
+          .filter(([, pids]) => pids.includes(observer.id))
+          .flatMap(([, pids]) => pids)
+          .filter((pid) => pid !== observer.id)
+      : [];
+
+    for (const targetId of targetIds) {
+      const target = next.players.find((p) => p.id === targetId);
+      if (!target || target.corruption <= 2) continue;
+
+      // 被动感知检定
+      const passiveRoll = rollD20();
+      const attrValue = Math.max((observer.attributes.insight || 0), (observer.attributes.aura || 0));
+      if (passiveRoll + attrValue >= 14) {
+        next = {
+          ...next,
+          logs: [
+            ...next.logs,
+            { id: uid(), round: next.round, phase: next.phase, text: `🔍【被动感知·仅${observer.roleName}可见】你注意到${target.roleName}的灵性波动异常——他可能承受了超出正常范围的污染负荷。` },
+          ],
+        };
+      }
+    }
   }
-  return null; // 全员已行动
+  return next;
 }
 
+// ══════════════════════════════════════════════════
+//  回合结算
 // ══════════════════════════════════════════════════
 //  回合结算
 // ══════════════════════════════════════════════════
@@ -606,6 +639,17 @@ export function resolveEnding(
   const publicEndingStorylet = investigationV2StoryletSeeds.find((s) => s.id === publicEndingId);
   const publicEndingText = publicEndingStorylet?.textSeed ?? "";
 
+  // 迷雾复盘：每人各自发现汇总
+  const fogLogs = next.players.map((p) => {
+    const publicCount = next.publicClueIds.length;
+    const privateCount = p.privateClueIds.length;
+    const items = p.inventory?.length ?? 0;
+    return {
+      id: uid(), round: state.round, phase: "resolution" as const,
+      text: `🌫️【${p.roleName}·个人复盘】公开线索:${publicCount} 私密发现:${privateCount} 持有证物:${items} 议程:${p.agendaCompleted ? "✅达成" : "❌未成"} 污染:${p.corruption}/10`,
+    };
+  });
+
   return {
     ...next,
     phase: "resolution",
@@ -614,6 +658,7 @@ export function resolveEnding(
       { id: uid(), round: state.round, phase: "resolution", text: `【结局】${endLogText}` },
       ...(publicEndingText ? [{ id: uid(), round: state.round, phase: "resolution" as const, text: `📜【案件收束】${publicEndingText}` }] : []),
       ...characterEndingLogs,
+      ...fogLogs,
     ],
   };
 }
@@ -695,6 +740,7 @@ export function serializePlayerState(
     agendaCompleted: player?.agendaCompleted ?? false,
     agendaGoal: player?.agendaGoal ?? "",
     agendaResult: getAgendaResult(player?.roleId ?? "", player?.agendaCompleted ?? false),
+    inventory: player?.inventory ?? [],
     firstLook: player?.firstLook ?? "",
     lastOutcome: player?.lastOutcome ?? null,
   };
