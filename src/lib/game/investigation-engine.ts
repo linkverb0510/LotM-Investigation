@@ -292,9 +292,15 @@ export function executePlayerAction(
   // 查找匹配 Storylet
   const storylet = findMatchingStorylet(state, player.roleId, attribute, action.targetId);
 
-  // 计算难度
+  // 计算难度（打头阵：P1首个行动者降难度+提示）
+  let pressureMod = state.pressureTier;
+  const isVanguard = state.phase === "investigation_up" && state.pendingActions.length === 0;
+  if (isVanguard) {
+    pressureMod = Math.max(0, pressureMod - 1); // 先锋降低压力影响
+  }
+
   const difficulty = calcDifficulty(storylet?.check?.baseDifficulty ?? 12, {
-    pressureTier: state.pressureTier,
+    pressureTier: pressureMod,
     characterCorruption: player.corruption,
     priorSuccess: storylet
       ? state.players.some(
@@ -827,6 +833,96 @@ const PATHWAY_ABILITIES: PathwayAbility[] = [
       },
     },
   },
+  {
+    id: "lyle-trace-detect",
+    name: "痕迹鉴定",
+    roleId: "role-02-lyle",
+    attribute: "cunning",
+    defense: "cunning",
+    difficulty: 12,
+    results: {
+      revelation: {
+        userText: "你以魔术师的眼光审视了对方留在现场的痕迹——不是物理痕迹，是行为痕迹。你认出了他在某个关键节点上有意回避了一个方向。不是不知道——是不愿意看。而且你注意到他的手部微动作——他在现场留下过什么东西，然后又在没人注意的时候收了回去。他的行动轨迹里有一个两分钟的空白。那两分钟发生了什么？",
+        targetPerception: "灰雾魔术师的目光在你身上和周围的环境之间来回跳跃了三次——他在追踪。不是你的位置，是你做过的事。",
+      },
+      success: {
+        userText: "对方声称在某个时间经过了教堂南侧——但你在那个时间点发现了不一致的灰尘痕迹。他经过了那里——但停留了比声称的更久。他在观察什么？还是在等待谁？",
+        targetPerception: "你注意到魔术师在盯着你脚下的地面——他在看灰尘的分布。他知道你在哪停留过。",
+      },
+      partial: {
+        userText: "你注意到对方的行为轨迹中有几处不自然的中断——但他处理得非常干净。干净到你无法确定那是刻意抹去的还是本来就不存在。这个人知道如何消除自己的痕迹。",
+        targetPerception: "",
+      },
+      failure: {
+        userText: "对方的行为轨迹在你眼中像一幅完整的拼图——太完整了。一个真正没有秘密的人不会这么干净。但这种干净本身不是证据。",
+        targetPerception: "",
+      },
+      catastrophe: {
+        userText: "你在鉴定对方行为轨迹时，发现了一种你自己也用过的手法——制造假痕迹来掩盖真路径。但你无法确认是他用的还是你自己留下的。污染+1。不是他——是你。你在这个现场也留下过痕迹，而且你自己已经不记得了。",
+        targetPerception: "魔术师在检查某个角落时突然僵住了——他在那里发现了一个不属于你应该在那里的东西。他看着它，然后迅速地把它塞进了自己的口袋。",
+      },
+    },
+  },
+  {
+    id: "austen-threat-assess",
+    name: "威胁评估",
+    roleId: "role-03-austen",
+    attribute: "physique",
+    defense: "will",
+    difficulty: 10,
+    results: {
+      revelation: {
+        userText: "你的航海家直觉在你审视对方时精确地计算出了风险等级：这个人在最近的行动中承受了比公开记录更多次的灵性冲击。他的状态比表面看起来更差——但他的行为模式显示他正在刻意保持稳定。他不是不知道自己的状态——他在压。像暴风雨前压住船舱一样压。但他还能压多久？",
+        targetPerception: "代罚者军官在看你的时候，眼神是评估式的——他在计算你不是作为一个人，而是作为一个变量。他评估的不是你对团队的威胁——是你能撑多久。",
+      },
+      success: {
+        userText: "你的航海家直觉告诉你：对方的反应速度比他应该表现出的慢了大约半秒。不是疲劳——是灵性负荷。他最近接触过某种高强度的灵性源。在海上我们会说他的船吃水太深了。",
+        targetPerception: "你感到一阵被评估的不适——代罚者的目光像在检查武器清单一样扫过你的姿态和呼吸节奏。",
+      },
+      partial: {
+        userText: "对方的体态和呼吸都保持得很好——但保持得太好了。一个真正没事的人不需要刻意维持。你能感觉到他底下有什么东西在动——但你不确定是身体上的还是灵性上的。",
+        targetPerception: "",
+      },
+      failure: {
+        userText: "对方在你眼中像一艘刚补过漆的船——所有可见的部分都完好无损。但你见过太多在港口沉掉的船。外表说明不了任何事。",
+        targetPerception: "",
+      },
+      catastrophe: {
+        userText: "你在评估对方状态时，突然感觉自己的灵性感知被什么东西猛地拽了一下——不是对方的异常，是你自己的。你的左手在没有意识指令的情况下抽搐了一下。那是你在海上第一次被风暴卷下甲板时留下的旧伤。石碑的辐射在激活你体内所有受过灵性损伤的旧痕迹。污染+1。你无法继续评估——你需要先评估自己。",
+        targetPerception: "代罚者军官的左手突然抽搐了一下——他自己也被吓了一跳。他低头看着那只手，像是看着一个很久没见的老朋友。",
+      },
+    },
+  },
+  {
+    id: "devlin-spirit-resonance",
+    name: "灵界共鸣",
+    roleId: "role-05-devlin",
+    attribute: "aura",
+    defense: "aura",
+    difficulty: 12,
+    results: {
+      revelation: {
+        userText: "你的灵界视野在对方身上捕捉到了两层不该同时出现的痕迹：一层是活人的灵性波动——正常。另一层是死者的残响残留——不正常。这个人最近接触过死者。不是通过尸体——是通过灵界直接接触。而且你认出了那种残响的频率——它与第二名死者身上的残留频率有部分重叠。他不是偶遇了死者——他是在灵界中与死者有过交流。",
+        targetPerception: "通灵师看你的眼神变了——她不是在看你活着的样子。她在看你身上是否附着某种不属于你的东西。",
+      },
+      success: {
+        userText: "对方的灵性波动中掺杂着微弱的灵界干扰——量很少，但频率很新。这不是长期在灵界附近工作积累的痕迹——这是最近四十八小时内主动接触过灵界才有的特征。他接触了哪个死者？还是接触了石碑？",
+        targetPerception: "通灵师的目光在你身上扫过时异常尖锐——她的瞳孔在无意识地扩大。她看到了你身上某种你看不到的东西。",
+      },
+      partial: {
+        userText: "对方的灵性波动在你看来有一层薄薄的异色——像是被另一种灵性来源漂染过。但痕迹太淡了，你无法确定是什么。可能是灵界接触，可能是石碑辐射的影响，也可能只是紧张。",
+        targetPerception: "",
+      },
+      failure: {
+        userText: "石碑的低频辐射污染了整个空间的灵性视野——你看谁都像隔着一层灰白色的水。对方的身影在灵界视野中只是一团模糊的轮廓。",
+        targetPerception: "",
+      },
+      catastrophe: {
+        userText: "你在试图读取对方的灵性波动时，你的通灵能力被石碑辐射反向激活了——不是你在连接对方的灵性，是石碑通过你在连接。你在那一瞬间听到了「还没结束」——不是来自对方，是来自你脚下。污染+1。你的灵界视野暂时被灰白色的静默充满。你什么都看不到了。",
+        targetPerception: "通灵师猛地后退了一步——她的眼神在那一瞬间变成了玻璃珠一样的空白。她不在看你。她在看正在她脑子里说话的那个东西。",
+      },
+    },
+  },
 ];
 
 /** 使用讨论途径能力 */
@@ -1015,10 +1111,17 @@ export const INVESTIGATION_TARGETS: Record<string, InvestigationTarget> = {
 export function getAvailableTargets(phase: string): InvestigationTarget[] {
   const all = Object.values(INVESTIGATION_TARGETS);
   if (phase === "investigation_up") {
+    // P1：仅开放基础调查地点
     return all.filter((t) =>
-      ["basement", "morgue", "archives", "church_perimeter", "spirit_realm"].includes(t.id)
+      ["basement", "morgue", "archives", "church_perimeter"].includes(t.id)
     );
   }
+  if (phase === "investigation_down") {
+    // P3：全部开放
+    return all;
+  }
+  return [];
+}
   if (phase === "investigation_down") {
     return all; // P3 所有目标可用
   }

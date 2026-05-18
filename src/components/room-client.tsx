@@ -120,6 +120,26 @@ function getClueDesc(cid: string): string {
   return CLUE_LABELS[cid]?.desc ?? "";
 }
 
+// ── 卡牌类别 → 颜色+图标 ──
+
+const CARD_STYLE: Record<string, { color: string; icon: string; bg: string }> = {
+  "搜证": { color: "#d4a574", icon: "🔍", bg: "#d4a57415" },
+  "净化": { color: "#58a6ff", icon: "💙", bg: "#58a6ff15" },
+  "压制": { color: "#f85149", icon: "⚔️", bg: "#f8514915" },
+  "接触": { color: "#3fb950", icon: "🤝", bg: "#3fb95015" },
+  "掩饰": { color: "#bc8c4c", icon: "🃏", bg: "#bc8c4c15" },
+  "调度": { color: "#8b5cf6", icon: "📋", bg: "#8b5cf615" },
+  "封印物": { color: "#d29922", icon: "⚠️", bg: "#d2992215" },
+};
+
+function getCardStyle(card: any): { color: string; icon: string; bg: string } {
+  for (const [key, style] of Object.entries(CARD_STYLE)) {
+    if ((card.category || "").includes(key)) return style;
+    if ((card.description || "").includes(key)) return style;
+  }
+  return { color: "#8b949e", icon: "🃏", bg: "#8b949e15" };
+}
+
 // ═══════════════════════════════════════
 //  主组件
 // ═══════════════════════════════════════
@@ -556,6 +576,39 @@ export function RoomClient({ roomCode }: { roomCode: string }) {
                   ))}
                 </div>
               )}
+              {roleId === "role-02-lyle" && (
+                <div style={{ marginTop: 16 }}>
+                  <span style={{ color: "#8b949e", fontSize: 12 }}>🃏 占卜家途径 · 痕迹鉴定：</span>
+                  {state?.publicState?.players?.filter(p => p.id !== state.selfPlayerId).map((p) => (
+                    <button key={p.id} onClick={() => handleAbility("lyle-trace-detect", p.id)}
+                      style={{ margin: 4, padding: "4px 12px", background: "#bc8c4c22", color: "#bc8c4c", border: "1px solid #bc8c4c44", borderRadius: 6, cursor: "pointer", fontSize: 12 }}>
+                      鉴定 {p.roleName}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {roleId === "role-03-austen" && (
+                <div style={{ marginTop: 16 }}>
+                  <span style={{ color: "#8b949e", fontSize: 12 }}>⚓ 水手途径 · 威胁评估：</span>
+                  {state?.publicState?.players?.filter(p => p.id !== state.selfPlayerId).map((p) => (
+                    <button key={p.id} onClick={() => handleAbility("austen-threat-assess", p.id)}
+                      style={{ margin: 4, padding: "4px 12px", background: "#58a6ff22", color: "#58a6ff", border: "1px solid #58a6ff44", borderRadius: 6, cursor: "pointer", fontSize: 12 }}>
+                      评估 {p.roleName}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {roleId === "role-05-devlin" && (
+                <div style={{ marginTop: 16 }}>
+                  <span style={{ color: "#8b949e", fontSize: 12 }}>💀 收尸人途径 · 灵界共鸣：</span>
+                  {state?.publicState?.players?.filter(p => p.id !== state.selfPlayerId).map((p) => (
+                    <button key={p.id} onClick={() => handleAbility("devlin-spirit-resonance", p.id)}
+                      style={{ margin: 4, padding: "4px 12px", background: "#8b5cf622", color: "#8b5cf6", border: "1px solid #8b5cf644", borderRadius: 6, cursor: "pointer", fontSize: 12 }}>
+                      共鸣 {p.roleName}
+                    </button>
+                  ))}
+                </div>
+              )}
               <p style={{ color: "#8b949e", marginTop: 8 }}>
                 {state?.publicState?.discussionTopic ?? "根据当前发现，讨论并决定下一步行动。"}
               </p>
@@ -656,7 +709,9 @@ export function RoomClient({ roomCode }: { roomCode: string }) {
           background: "#161b22", borderTop: "1px solid #30363d",
           padding: "12px 20px", display: "flex", gap: 12, justifyContent: "center",
         }}>
-          {state.privateHand.map((card) => (
+          {state.privateHand.map((card) => {
+            const style = getCardStyle(card);
+            return (
             <div
               key={card.id}
               onClick={() => {
@@ -667,15 +722,16 @@ export function RoomClient({ roomCode }: { roomCode: string }) {
                 setSelectedCard(card);
               }}
               style={{
-                background: selectedCard?.id === card.id ? "#1f6feb22" : "#0d1117",
-                border: `2px solid ${selectedCard?.id === card.id ? "#58a6ff" : "#30363d"}`,
+                background: selectedCard?.id === card.id ? "#1f6feb22" : style.bg,
+                border: `2px solid ${selectedCard?.id === card.id ? "#58a6ff" : style.color + "44"}`,
+                borderLeft: `4px solid ${style.color}`,
                 borderRadius: 8, padding: "10px 14px", cursor: "pointer",
                 minWidth: 160, maxWidth: 200,
                 transition: "border-color 0.15s",
               }}
             >
-              <div style={{ fontSize: 14, fontWeight: 600 }}>{card.name}</div>
-              <div style={{ fontSize: 11, color: "#58a6ff", marginTop: 2 }}>{card.cost.spirituality} 灵性</div>
+              <div style={{ fontSize: 14, fontWeight: 600 }}>{style.icon} {card.name}</div>
+              <div style={{ fontSize: 11, color: style.color, marginTop: 2 }}>{card.cost.spirituality} 灵性</div>
               <div style={{ fontSize: 11, color: "#8b949e", marginTop: 4, lineHeight: 1.4 }}>{card.description}</div>
             </div>
           ))}
