@@ -19,6 +19,7 @@ interface FrontendPlayer {
   id: string; name: string; isHost: boolean; isConnected: boolean;
   roleName: string; roleTitle: string; roleOrg: string;
   hasActed: boolean;
+  corruption: number;
 }
 
 interface FrontendPublicState {
